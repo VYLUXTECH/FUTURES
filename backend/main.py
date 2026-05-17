@@ -59,6 +59,7 @@ _bot_state: dict = {
     "start_time": None,
 }
 _telegram_bot: TelegramAdminBot | None = None
+_trading_thread: threading.Thread | None = None
 
 CANDLE_TF = "15m"
 LOOP_INTERVAL_SECS = 60
@@ -120,12 +121,13 @@ async def lifespan(app: FastAPI):
         logger.error("Missing required env vars: %s", missing)
     else:
         init_db()
-        trading_thread = threading.Thread(
+        global _trading_thread
+        _trading_thread = threading.Thread(
             target=trading_loop,
             name="trading_loop",
             daemon=False,
         )
-        trading_thread.start()
+        _trading_thread.start()
         logger.info("FUTURES trading engine started")
 
     # ── Start Telegram admin bot ─────────────────────
@@ -140,10 +142,15 @@ async def lifespan(app: FastAPI):
 
     yield
 
+    _stop_event.set()
+    _bot_state["running"] = False
+    if _trading_thread and _trading_thread.is_alive():
+        logger.info("Waiting for trading thread to finish...")
+        _trading_thread.join(timeout=30)
+        if _trading_thread.is_alive():
+            logger.warning("Trading thread did not stop within 30s")
     if _telegram_bot:
         await _telegram_bot.stop()
-    _stop_event.set()
-    market_engine.stop()
     logger.info("FUTURES shutting down...")
 
 
@@ -155,11 +162,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:8081").split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    allow_credentials=True,
 )
 
 # ── Routes ───────────────────────────────────────────────
@@ -216,6 +226,32 @@ if SITE_DIR.exists():
 # ── MT5 Init ─────────────────────────────────────────────
 def init_mt5() -> bool:
     login, password, server = get_mt5_creds()
+    pending_login = _bot_state.get("pending_mt5_login")
+    pending_server = _bot_state.get("pending_mt5_server")
+    if pending_login and pending_server:
+        login = pending_login
+        server = pending_server
+        from brain.db.supabase import _get_conn
+        from brain.utils.crypto import decrypt_password
+        try:
+            conn = _get_conn(SUPABASE_DB_URI)
+            with conn, conn.cursor() as cur:
+                cur.execute(
+                    "SELECT password FROM mt5_credentials WHERE login = %s AND server = %s ORDER BY updated_at DESC LIMIT 1",
+                    (login, server),
+                )
+                row = cur.fetchone()
+            conn.close()
+            if row:
+                try:
+                    password = decrypt_password(row[0])
+                except Exception:
+                    password = row[0]
+        except Exception as exc:
+            logger.warning("Failed to fetch pending account password: %s", exc)
+        _bot_state.pop("pending_mt5_login", None)
+        _bot_state.pop("pending_mt5_server", None)
+        logger.info("Switched MT5 account: login=%s | server=%s", login, server)
     if not login or not server:
         logger.error("No MT5 credentials found in Supabase")
         return False
@@ -307,11 +343,13 @@ def trading_loop() -> None:
             _stop_event.wait(timeout=60)
             continue
 
-        if has_open_position():
-            elapsed = time.monotonic() - cycle_start
-            sleep_for = max(0.0, LOOP_INTERVAL_SECS - elapsed)
-            _stop_event.wait(timeout=sleep_for)
-            continue
+        trading_mode = _bot_state.get("trading_mode", "short")
+        if trading_mode == "short":
+            if has_open_position():
+                elapsed = time.monotonic() - cycle_start
+                sleep_for = max(0.0, LOOP_INTERVAL_SECS - elapsed)
+                _stop_event.wait(timeout=sleep_for)
+                continue
         risk_percent = _bot_state.get("risk_percent")
         account_info = mt5.account_info()
         account_balance = getattr(account_info, "balance", 10000.0) if account_info else 10000.0
@@ -346,7 +384,9 @@ def trading_loop() -> None:
             continue
         pair = best["_pair"]
         sl_pips = best["sl_pips"]
-        lots = risk.calculate_lot(pair, account_balance, sl_pips, risk_percent)
+        trading_mode = _bot_state.get("trading_mode", "short")
+        auto_compound = _bot_state.get("auto_compounding", False) and trading_mode == "long"
+        lots = risk.calculate_lot(pair, account_balance, sl_pips, risk_percent, auto_compound=auto_compound)
         logger.info("Best signal: %s %s | conf=%d | lots=%.2f", best["direction"], pair, best["confidence"], lots)
         try:
             result = place_order(

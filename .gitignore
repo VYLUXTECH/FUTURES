@@ -1,17 +1,27 @@
-# Dependencies
-node_modules/
-
-# Build output
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
 dist/
+build/
+*.whl
 
-# Environment files (NEVER commit!)
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment
 .env
 .env.local
 .env.*.local
 
 # IDE
-.idea/
 .vscode/
+.idea/
 *.swp
 *.swo
 
@@ -19,46 +29,37 @@ dist/
 .DS_Store
 Thumbs.db
 
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
 # Logs
 logs/
 *.log
-npm-debug.log*
+
+# Charts
+charts/
+
+# Node
+node_modules/
+package-lock.json
+
+# Expo
+expo-app/dist/
+expo-app/.expo/
+
+# Data files
+scripts/data/
+scripts/data_free/
+scripts/data_yf/
+
+# Backend static
+backend/static/
+
+# Coverage
+.coverage
+htmlcov/
 
 # Testing
-coverage/
-
-# Cache
-.cache/
-*.tsbuildinfo
-
-# K.I.T. specific
-# API keys and secrets
-credentials.json
-secrets.json
-
-# User workspace data (keep templates, ignore user data)
-workspace/memory/
-workspace/MEMORY.md
-
-# Backtest data (can be large)
-data/historical/
-*.csv
-
-# Reports (regeneratable)
-reports/
-
-__pycache__/
-*.pyc
-.kit/
-
-# Forum credentials (sensitive)
-workspace/forum-credentials.json
-
-# Config with live credentials (sensitive)
-kit-config.json
-forum-backend/.env.production
-forum-backend/.env.local
-
-# Sandbox test files (temporary)
-sandbox-test.*
-SANDBOX_TEST_REPORT.md
+.pytest_cache/

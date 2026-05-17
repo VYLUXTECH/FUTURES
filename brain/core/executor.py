@@ -25,9 +25,11 @@ from config.constants import (
     TRAILING_ATR_MULT,
     TRAILING_TRIGGER_PIPS,
 )
-from db import sync_trade
+from db import sync_trade, get_state
 
 logger = logging.getLogger(__name__)
+
+DRY_RUN_KEY = "dry_run"
 
 # Retcodes that justify a retry (price moved, not a logic error)
 _RETRYABLE_RETCODES: frozenset[int] = frozenset({
@@ -64,6 +66,22 @@ def place_order(
 
     Returns the MT5 order result dict, or None on failure.
     """
+    if get_state(DRY_RUN_KEY, default=False):
+        logger.info(
+            "DRY RUN | %s %s | lots=%.2f | entry=%.5f | sl=%.5f | tp=%.5f | conf=%d%%",
+            direction, pair, lots, entry_price, sl_price, tp_price, confidence,
+        )
+        sync_trade(
+            ticket=0, pair=pair, direction=direction,
+            lots=lots, entry_price=entry_price, sl_price=sl_price,
+            tp_price=tp_price, pnl=None, status="DRY_RUN",
+            opened_at=datetime.now(timezone.utc).isoformat(),
+            closed_at=None, confidence=confidence,
+            sectors_json=json.dumps(sectors) if sectors else None,
+            uri=supabase_uri,
+        )
+        return {"ticket": 0, "entry": entry_price, "retcode": 0, "dry_run": True}
+
     if not mt5.symbol_select(pair, True):
         logger.error("symbol_select(%s) failed – cannot place order", pair)
         return None
@@ -191,11 +209,10 @@ def close_position(
 
     result = mt5.order_send(request)
     if result and result.retcode == mt5.TRADE_RETCODE_DONE:
-        # Lookup PnL from MT5 deal history
         pnl = _get_position_pnl(ticket)
         sync_trade(
             ticket=ticket, pair=pair, direction=direction, lots=lots,
-            entry_price=price, sl_price=0, tp_price=0, pnl=pnl,
+            entry_price=None, sl_price=0, tp_price=0, pnl=pnl,
             status="CLOSED", opened_at="", closed_at=datetime.now(timezone.utc).isoformat(),
             confidence=0, uri=supabase_uri,
         )

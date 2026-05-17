@@ -62,12 +62,30 @@ class BotStatusResponse(BaseModel):
 @router.get("/health")
 async def health() -> dict:
     """Lightweight health check. Does NOT block trading loop."""
-    terminal = mt5.terminal_info()
-    connected = terminal is not None and bool(terminal.connected)
+    from db import test_connection
+    from config.settings import SUPABASE_DB_URI
+
+    loop = asyncio.get_event_loop()
+    terminal = await loop.run_in_executor(None, mt5.terminal_info)
+    mt5_connected = terminal is not None and bool(terminal.connected)
+
+    db_ok = False
+    try:
+        db_ok, _ = await loop.run_in_executor(None, test_connection, SUPABASE_DB_URI)
+    except Exception:
+        pass
+
+    status = "ok"
+    if not mt5_connected:
+        status = "degraded"
+    if not db_ok:
+        status = "degraded"
+
     return {
-        "status":    "ok",
-        "mt5":       connected,
-        "version":   "1.0.0",
+        "status":      status,
+        "mt5":         mt5_connected,
+        "database":    db_ok,
+        "version":     "1.0.0",
     }
 
 
@@ -147,7 +165,7 @@ async def get_trades(limit: int = 50) -> dict:
 # ── Bot Start / Stop (state only – trading loop in main.py) ─
 
 class StartBotRequest(BaseModel):
-    mode: str | None = "long"
+    mode: str | None = "short"
     trade_count: int | None = 1
     risk_percent: float | None = None
 
@@ -155,6 +173,7 @@ class StartBotRequest(BaseModel):
 @router.post("/api/user/start")
 async def start_bot(req: StartBotRequest | None = None, request: Request = None) -> dict:
     """Signal the trading loop to (re)start. Accepts risk config.
+    Modes: 'short' (single trade, default), 'long' (continuous trading with auto-compounding).
     If the trading thread isn't running yet, starts it with
     MT5 credentials from Supabase mt5_credentials table.
     Requires broker_verified profile to trade."""
@@ -194,6 +213,9 @@ async def start_bot(req: StartBotRequest | None = None, request: Request = None)
             from config.constants import MIN_RISK_PERCENT, MAX_RISK_PERCENT
             risk_pct = max(MIN_RISK_PERCENT, min(MAX_RISK_PERCENT, risk_pct))
             _bot_state["risk_percent"] = risk_pct
+        mode = req.mode or "short"
+        _bot_state["trading_mode"] = mode
+        _bot_state["trade_count"] = req.trade_count or 1
 
     trading_thread = _bot_state.get("trading_thread")
     if trading_thread and trading_thread.is_alive():
@@ -298,6 +320,7 @@ class MT5ConnectRequest(BaseModel):
     login: str
     password: str
     server: str
+    account_name: str | None = None
 
 
 @router.post("/api/mt5/connect")
@@ -306,6 +329,7 @@ async def mt5_connect(req: MT5ConnectRequest) -> dict:
     Test MT5 connection and update status in Supabase.
     Credentials are saved by the frontend directly — this endpoint
     only tests connectivity and persists the connection result.
+    Supports multiple accounts via account_name field.
     """
     import os
     from config.settings import SUPABASE_DB_URI
@@ -327,6 +351,7 @@ async def mt5_connect(req: MT5ConnectRequest) -> dict:
     if not password_to_use and uri:
         try:
             from db.supabase import _get_conn
+            from utils.crypto import decrypt_password
             conn = _get_conn(uri)
             with conn, conn.cursor() as cur:
                 cur.execute(
@@ -336,7 +361,10 @@ async def mt5_connect(req: MT5ConnectRequest) -> dict:
                 row = cur.fetchone()
             conn.close()
             if row:
-                password_to_use = row[0]
+                try:
+                    password_to_use = decrypt_password(row[0])
+                except Exception:
+                    password_to_use = row[0]
                 if not server_to_use and row[1]:
                     server_to_use = row[1]
         except Exception as exc:
@@ -487,7 +515,7 @@ async def get_mt5_credentials() -> dict:
         conn = _get_conn(uri)
         with conn, conn.cursor() as cur:
             cur.execute(
-                "SELECT login, server, connected FROM mt5_credentials ORDER BY updated_at DESC LIMIT 1"
+                "SELECT login, server, connected, account_name FROM mt5_credentials ORDER BY updated_at DESC LIMIT 1"
             )
             row = cur.fetchone()
         conn.close()
@@ -496,11 +524,87 @@ async def get_mt5_credentials() -> dict:
                 "login":     row[0],
                 "server":    row[1],
                 "connected": bool(row[2]),
+                "account_name": row[3] if len(row) > 3 else None,
             }
     except Exception as exc:
         logger.warning("Failed to read MT5 credentials: %s", exc)
 
     return {"login": None, "server": None, "connected": False}
+
+
+@router.get("/api/mt5/accounts")
+async def list_mt5_accounts() -> dict:
+    """List all saved MT5 accounts."""
+    import os
+    from config.settings import SUPABASE_DB_URI
+
+    uri = SUPABASE_DB_URI or os.getenv("SUPABASE_DB_URI")
+    if not uri:
+        return {"accounts": []}
+
+    try:
+        from db.supabase import _get_conn
+        conn = _get_conn(uri)
+        with conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT login, server, connected, account_name, updated_at FROM mt5_credentials ORDER BY updated_at DESC"
+            )
+            rows = cur.fetchall()
+        conn.close()
+        accounts = []
+        for row in rows:
+            accounts.append({
+                "login": row[0],
+                "server": row[1],
+                "connected": bool(row[2]),
+                "account_name": row[3] or f"Account {row[0]}",
+                "updated_at": row[4].isoformat() if row[4] else None,
+            })
+        return {"accounts": accounts}
+    except Exception as exc:
+        logger.warning("Failed to list MT5 accounts: %s", exc)
+
+    return {"accounts": []}
+
+
+class SwitchAccountRequest(BaseModel):
+    login: str
+    server: str
+
+
+@router.post("/api/mt5/switch")
+async def switch_mt5_account(req: SwitchAccountRequest) -> dict:
+    """Switch the active MT5 account. Requires bot to be stopped."""
+    if _bot_state.get("running"):
+        raise HTTPException(status_code=400, detail="Stop the bot before switching accounts")
+
+    import os
+    from config.settings import SUPABASE_DB_URI
+
+    uri = SUPABASE_DB_URI or os.getenv("SUPABASE_DB_URI")
+    if not uri:
+        return {"status": "error", "detail": "Database not configured"}
+
+    try:
+        from db.supabase import _get_conn
+        conn = _get_conn(uri)
+        with conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT password FROM mt5_credentials WHERE login = %s AND server = %s ORDER BY updated_at DESC LIMIT 1",
+                (req.login, req.server),
+            )
+            row = cur.fetchone()
+        conn.close()
+        if not row:
+            raise HTTPException(status_code=404, detail="Account not found")
+        _bot_state["pending_mt5_login"] = int(req.login)
+        _bot_state["pending_mt5_server"] = req.server
+        return {"status": "switched", "login": req.login, "server": req.server}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning("Failed to switch MT5 account: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 class UpdateMT5CredentialsRequest(BaseModel):
@@ -600,8 +704,14 @@ def _decode_jwt(request: Request) -> dict:
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
         return {}
+    token = auth.split(" ", 1)[1]
     try:
-        payload_b64 = auth.split(".")[1]
+        from backend.api.middleware import decode_jwt_payload
+        return decode_jwt_payload(token)
+    except ImportError:
+        pass
+    try:
+        payload_b64 = token.split(".")[1]
         padded = payload_b64 + "=" * (4 - len(payload_b64) % 4)
         payload = json.loads(base64.urlsafe_b64decode(padded))
         return payload
@@ -640,10 +750,10 @@ async def create_support_ticket(req: SupportTicketRequest, request: Request) -> 
             ticket_id = row[0] if row else None
 
             if user_id:
-                    cur.execute(
-                        "SELECT display_name FROM profiles WHERE id = %s",
-                        (user_id,),
-                    )
+                cur.execute(
+                    "SELECT display_name FROM profiles WHERE id = %s",
+                    (user_id,),
+                )
                 profile = cur.fetchone()
                 if profile and profile[0]:
                     display_name = f"{profile[0]} ({email})"

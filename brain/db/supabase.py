@@ -134,8 +134,8 @@ def get_open_trades(uri: str | None = None) -> list[dict]:
 def count_trades_today(uri: str | None = None) -> int:
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     rows = _exec_query(
-        "SELECT COUNT(*) AS cnt FROM trades WHERE opened_at::text LIKE %s",
-        (f"{today}%",), uri=uri, fetch=True,
+        "SELECT COUNT(*) AS cnt FROM trades WHERE opened_at::date = %s",
+        (today,), uri=uri, fetch=True,
     )
     return rows[0]["cnt"] if rows else 0
 
@@ -154,8 +154,8 @@ def get_todays_pnl(uri: str | None = None) -> float:
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     rows = _exec_query(
         """SELECT COALESCE(SUM(pnl), 0) AS total FROM trades
-           WHERE status='CLOSED' AND closed_at::text LIKE %s""",
-        (f"{today}%",), uri=uri, fetch=True,
+           WHERE status='CLOSED' AND closed_at::date = %s""",
+        (today,), uri=uri, fetch=True,
     )
     return float(rows[0]["total"]) if rows else 0.0
 
@@ -222,6 +222,7 @@ def log_signal(
                      json.dumps(sectors) if sectors else None),
                 )
             conn.commit()
+            conn.close()
         except Exception as exc:
             logger.warning("Supabase signal log error: %s", exc)
 
@@ -255,16 +256,21 @@ def upsert_user_setting(
     if not uri:
         return
 
+    ALLOWED_FIELDS = {"max_daily_trades", "risk_percent", "be_policy", "dry_run", "auto_compounding", "display_name", "notifications"}
+    if field not in ALLOWED_FIELDS:
+        logger.warning("Rejected upsert_user_setting for disallowed field: %s", field)
+        return
+
     def _task() -> None:
         try:
             conn = _get_conn(uri)
             with conn, conn.cursor() as cur:
                 cur.execute(
-                    """INSERT INTO user_settings (user_id, {field}, updated_at)
+                    f"""INSERT INTO user_settings (user_id, {field}, updated_at)
                        VALUES (%s, %s, NOW())
                        ON CONFLICT (user_id) DO UPDATE SET
                            {field} = EXCLUDED.{field},
-                           updated_at = NOW()""".format(field=field),
+                           updated_at = NOW()""",
                     (user_id, value),
                 )
             conn.close()

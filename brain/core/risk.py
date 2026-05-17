@@ -207,6 +207,7 @@ class RiskEngine:
         account_balance: float,
         sl_pips: float,
         risk_percent: float | None = None,
+        auto_compound: bool = False,
     ) -> float:
         """
         Dynamic lot sizing using MT5 tick value.

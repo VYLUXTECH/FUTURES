@@ -1,7 +1,10 @@
 import * as SecureStore from 'expo-secure-store'
 import { Platform } from 'react-native'
+import Constants from 'expo-constants'
 
-const BASE_URL = Platform.select({
+const EXPO_PUBLIC_API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_API_URL
+
+const BASE_URL = EXPO_PUBLIC_API_URL || Platform.select({
   web: '/api',
   android: 'http://10.0.2.2:8000/api',
   ios: 'http://localhost:8000/api',
@@ -26,15 +29,24 @@ async function request<T>(
   }
   if (token) headers['Authorization'] = `Bearer ${token}`
 
-  const res = await fetch(`${BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }))
-    throw new Error(err.detail || `HTTP ${res.status}`)
+  const url = `${BASE_URL}${endpoint}`
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 15000)
+
+  try {
+    const res = await fetch(url, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }))
+      throw new Error(err.detail || `HTTP ${res.status}`)
+    }
+    return res.json()
+  } finally {
+    clearTimeout(timeoutId)
   }
-  return res.json()
 }
 
 export const api = {

@@ -47,13 +47,16 @@ async def sign_out(access_token: str) -> dict:
     client = get_client()
     if not client:
         return {"error": "Supabase not configured"}
-    client.auth.sign_out()
+    if access_token:
+        client.auth.sign_out()
     return {"status": "signed_out"}
 
 
 async def get_user(access_token: str) -> dict | None:
     client = get_client()
     if not client:
+        return None
+    if not access_token:
         return None
     res = client.auth.get_user(access_token)
     return res.user.model_dump() if res.user else None

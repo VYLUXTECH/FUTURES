@@ -138,7 +138,7 @@ async def get_mt5_credentials(request: Request) -> dict:
 
 @router.post("/mt5/credentials")
 async def save_mt5_credentials(req: MT5CredentialsUpdate, request: Request) -> dict:
-    """Save full MT5 credentials (used by web signup page)."""
+    """Save full MT5 credentials (used by web signup page). Password is encrypted."""
     client = get_client()
     if not client:
         return {"error": "Supabase not configured"}
@@ -146,10 +146,11 @@ async def save_mt5_credentials(req: MT5CredentialsUpdate, request: Request) -> d
     if not req.login or not req.password:
         return {"error": "login and password required"}
     try:
+        from brain.utils.crypto import encrypt_password
         data: dict[str, Any] = {
             "user_id": user_id,
             "login": req.login,
-            "password": req.password,
+            "password": encrypt_password(req.password),
             "server": req.server or "",
         }
         client.table("mt5_credentials").upsert(data, on_conflict="user_id").execute()

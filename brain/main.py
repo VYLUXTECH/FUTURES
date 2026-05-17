@@ -6,13 +6,26 @@ import time
 import logging
 from datetime import datetime, timezone
 
+import os
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import MetaTrader5 as mt5
 
-from config.settings import (
-    SUPABASE_DB_URI, validate_required,
+ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:8081").split(",") if o.strip()]
+
+app = FastAPI(
+    title="FuturesBrain API",
+    version="2.0.0",
+    description="Price Action S/R Scalping Bot — 1:3 RR",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+    allow_credentials=True,
 )
 from config.constants import SUPPORTED_PAIRS, PIP_SIZES, API_HOST, API_PORT, SESSION_START_UTC, SESSION_END_UTC, MAX_DAILY_TRADES
 from core.pipeline import run as pipeline_run
@@ -65,6 +78,7 @@ def _fetch_mt5_creds_from_supabase() -> tuple[int, str, str] | None:
         return None
     try:
         from db.supabase import _get_conn
+        from utils.crypto import decrypt_password
         conn = _get_conn(SUPABASE_DB_URI)
         with conn, conn.cursor() as cur:
             cur.execute(
@@ -73,7 +87,13 @@ def _fetch_mt5_creds_from_supabase() -> tuple[int, str, str] | None:
             row = cur.fetchone()
         conn.close()
         if row:
-            return (int(row[0]), row[1], row[2])
+            login = int(row[0])
+            password = row[1]
+            try:
+                password = decrypt_password(password)
+            except Exception:
+                pass
+            return (login, password, row[2])
     except Exception as exc:
         logger.warning("Failed to fetch MT5 creds from Supabase: %s", exc)
     return None
@@ -237,11 +257,13 @@ def trading_loop() -> None:
             _stop_event.wait(timeout=60)
             continue
 
-        if has_open_position():
-            elapsed = time.monotonic() - cycle_start
-            sleep_for = max(0.0, SCAN_INTERVAL_SECS - elapsed)
-            _stop_event.wait(timeout=sleep_for)
-            continue
+        trading_mode = _bot_state.get("trading_mode", "short")
+        if trading_mode == "short":
+            if has_open_position():
+                elapsed = time.monotonic() - cycle_start
+                sleep_for = max(0.0, SCAN_INTERVAL_SECS - elapsed)
+                _stop_event.wait(timeout=sleep_for)
+                continue
 
         risk_percent = _bot_state.get("risk_percent")
         account_info = mt5.account_info()
@@ -258,7 +280,7 @@ def trading_loop() -> None:
                 df = data.get("15m")
                 if df is None or len(df) < 20:
                     continue
-                signal = pipeline_run(pair, CANDLE_TF, df, data=data)
+                signal = pipeline_run(pair, CANDLE_TF, df, risk=risk, risk_percent=risk_percent, data=data)
                 if signal is None:
                     continue
                 decision = risk.allow_trade(pair, current_atr=risk.baseline_atr.get(pair, 0), account_balance=account_balance)
@@ -280,7 +302,9 @@ def trading_loop() -> None:
 
         pair = best["_pair"]
         sl_pips = best["sl_pips"]
-        lots = risk.calculate_lot(pair, account_balance, sl_pips, risk_percent)
+        trading_mode = _bot_state.get("trading_mode", "short")
+        auto_compound = _bot_state.get("auto_compounding", False) and trading_mode == "long"
+        lots = risk.calculate_lot(pair, account_balance, sl_pips, risk_percent, auto_compound=auto_compound)
         logger.info("Best signal: %s %s | conf=%d | lots=%.2f", best["direction"], pair, best["confidence"], lots)
 
         try:
