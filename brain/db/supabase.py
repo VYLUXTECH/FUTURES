@@ -256,7 +256,7 @@ def upsert_user_setting(
     if not uri:
         return
 
-    ALLOWED_FIELDS = {"max_daily_trades", "risk_percent", "be_policy", "dry_run", "auto_compounding", "display_name", "notifications"}
+    ALLOWED_FIELDS = {"max_daily_trades", "risk_percent", "trading_mode"}
     if field not in ALLOWED_FIELDS:
         logger.warning("Rejected upsert_user_setting for disallowed field: %s", field)
         return

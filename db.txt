@@ -18,7 +18,7 @@ BEGIN
         SELECT tablename, policyname
         FROM pg_policies
         WHERE schemaname = 'public'
-          AND tablename IN ('trades', 'bot_state', 'signals', 'profiles', 'mt5_credentials', 'support_tickets', 'system_logs', 'news_state', 'legal_acceptances', 'referrals', 'referral_signups')
+          AND tablename IN ('trades', 'bot_state', 'signals', 'profiles', 'mt5_credentials', 'support_tickets', 'system_logs', 'news_state', 'legal_acceptances', 'referrals', 'referral_signups', 'user_settings')
     LOOP
         EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', pol.policyname, pol.tablename);
     END LOOP;
@@ -35,6 +35,7 @@ DROP TABLE IF EXISTS public.legal_acceptances CASCADE;
 DROP TABLE IF EXISTS public.support_tickets CASCADE;
 DROP TABLE IF EXISTS public.system_logs CASCADE;
 DROP TABLE IF EXISTS public.news_state CASCADE;
+DROP TABLE IF EXISTS public.user_settings CASCADE;
 DROP TABLE IF EXISTS public.mt5_credentials CASCADE;
 DROP TABLE IF EXISTS public.signals CASCADE;
 DROP TABLE IF EXISTS public.bot_state CASCADE;
@@ -105,18 +106,20 @@ CREATE TABLE public.signals (
 );
 
 -- ── 5. mt5_credentials ──────────────────────────────────────
--- MT5 login credentials per user.
--- user_id is the unique key — one MT5 account per user.
+-- MT5 login credentials per user. Supports multiple accounts per user.
 CREATE TABLE public.mt5_credentials (
-    user_id                     UUID PRIMARY KEY REFERENCES public.profiles(id) ON DELETE CASCADE,
-    login                       VARCHAR(50),
-    password                    VARCHAR(100),
-    server                      VARCHAR(100),
+    id                          BIGSERIAL PRIMARY KEY,
+    user_id                     UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    login                       VARCHAR(50) NOT NULL,
+    password                    VARCHAR(500) NOT NULL,
+    server                      VARCHAR(100) NOT NULL,
+    account_name                VARCHAR(100),
     connected                   BOOLEAN DEFAULT FALSE,
     automated_trading_enabled   BOOLEAN DEFAULT FALSE,
     last_error                  TEXT,
     last_connected_at           TIMESTAMPTZ,
-    updated_at                  TIMESTAMPTZ DEFAULT NOW()
+    updated_at                  TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(user_id, login, server)
 );
 
 -- ── 6. support_tickets ──────────────────────────────────────
@@ -129,6 +132,16 @@ CREATE TABLE public.support_tickets (
     message         TEXT,
     status          TEXT DEFAULT 'open',
     created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ── 6b. user_settings ──────────────────────────────────────
+-- Per-user configuration overrides (max_daily_trades, etc.)
+CREATE TABLE public.user_settings (
+    user_id             UUID PRIMARY KEY REFERENCES public.profiles(id) ON DELETE CASCADE,
+    max_daily_trades    INTEGER DEFAULT 5,
+    risk_percent        FLOAT DEFAULT 5.0,
+    trading_mode        TEXT DEFAULT 'short',
+    updated_at          TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ── 7. system_logs ──────────────────────────────────────────
@@ -202,6 +215,9 @@ CREATE INDEX idx_trades_user_status     ON public.trades(user_id, status);
 CREATE INDEX idx_signals_created_at     ON public.signals(created_at DESC);
 
 CREATE INDEX idx_mt5_credentials_user   ON public.mt5_credentials(user_id);
+CREATE INDEX idx_mt5_credentials_login  ON public.mt5_credentials(login, server);
+
+CREATE INDEX idx_user_settings_user     ON public.user_settings(user_id);
 
 CREATE INDEX idx_support_tickets_status ON public.support_tickets(status);
 CREATE INDEX idx_support_tickets_user   ON public.support_tickets(user_id);
@@ -232,6 +248,7 @@ ALTER TABLE public.news_state           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.legal_acceptances    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.referrals            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.referral_signups     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_settings        ENABLE ROW LEVEL SECURITY;
 
 -- ── profiles ────────────────────────────────────────────────
 -- Users can read & update their own profile
@@ -287,6 +304,10 @@ CREATE POLICY "Users can insert own mt5 credentials"
 
 CREATE POLICY "Users can update own mt5 credentials"
     ON public.mt5_credentials FOR UPDATE
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own mt5 credentials"
+    ON public.mt5_credentials FOR DELETE
     USING (auth.uid() = user_id);
 
 -- Service role can do everything
@@ -352,6 +373,25 @@ CREATE POLICY "Users can view own referral signup"
 -- Service role can do everything
 CREATE POLICY "Service role full access referral_signups"
     ON public.referral_signups FOR ALL
+    USING (true) WITH CHECK (true);
+
+-- ── user_settings ───────────────────────────────────────────
+-- Users can read & update their own settings
+CREATE POLICY "Users can view own settings"
+    ON public.user_settings FOR SELECT
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own settings"
+    ON public.user_settings FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own settings"
+    ON public.user_settings FOR UPDATE
+    USING (auth.uid() = user_id);
+
+-- Service role can do everything
+CREATE POLICY "Service role full access user_settings"
+    ON public.user_settings FOR ALL
     USING (true) WITH CHECK (true);
 
 -- ============================================================

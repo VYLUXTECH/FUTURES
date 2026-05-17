@@ -36,13 +36,18 @@ def _get_jwt_secret() -> str:
 
 
 def decode_jwt_payload(token: str) -> dict:
+    if not token or "." not in token:
+        return {}
     secret = _get_jwt_secret()
     if not secret:
-        payload_b64 = token.split(".")[1]
-        import base64
-        import json
-        padded = payload_b64 + "=" * (4 - len(payload_b64) % 4)
-        return json.loads(base64.urlsafe_b64decode(padded))
+        try:
+            import base64
+            import json
+            payload_b64 = token.split(".")[1]
+            padded = payload_b64 + "=" * (4 - len(payload_b64) % 4)
+            return json.loads(base64.urlsafe_b64decode(padded))
+        except Exception:
+            return {}
     try:
         payload = jwt.decode(token, secret, algorithms=["HS256"], audience="authenticated")
         return payload
