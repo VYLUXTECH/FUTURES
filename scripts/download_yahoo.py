@@ -8,6 +8,11 @@ PAIRS = {
     "GBPUSD": "GBPUSD=X",
     "GBPJPY": "GBPJPY=X",
     "USDJPY": "USDJPY=X",
+    "EURUSD": "EURUSD=X",
+    "AUDUSD": "AUDUSD=X",
+    "USDCAD": "USDCAD=X",
+    "EURGBP": "EURGBP=X",
+    "EURJPY": "EURJPY=X",
 }
 
 data_dir = Path(__file__).parent / "data_yf"
@@ -19,9 +24,7 @@ for name, symbol in PAIRS.items():
     if df.empty:
         print(f"  WARNING: No data for {symbol}")
         continue
-    # Flatten MultiIndex: take first level (Price name)
     df.columns = [c[0].lower() for c in df.columns]
-    df = df.rename(columns={"close": "close", "high": "high", "low": "low", "open": "open", "volume": "volume"})
     df.index = pd.to_datetime(df.index, utc=True)
     out = data_dir / f"{name}_15m.csv"
     df.to_csv(out)
@@ -36,6 +39,6 @@ for name, symbol in PAIRS.items():
     df5.index = pd.to_datetime(df5.index, utc=True)
     out5 = data_dir / f"{name}_5m.csv"
     df5.to_csv(out5)
-    print(f"  Saved {out5} — {len(df5)} candles | {df5.index[0]} to {df5.index[-1]}")
+    print(f"  Saved {out5} — {len(df5)} candles | {df.index[0]} to {df.index[-1]}")
 
 print("\nDone.")

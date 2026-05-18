@@ -9,13 +9,25 @@ VERSION: str = "1.0.0"
 APP_NAME: str = "FuturesBrain"
 
 # ── Supported Instruments ──────────────────────────────────
-SUPPORTED_PAIRS: list[str] = ["GBPUSD", "GBPJPY", "USDJPY"]
+# Original 3: GBPUSD, GBPJPY, USDJPY
+# Added 5: EURUSD, AUDUSD, USDCAD, EURGBP, EURJPY
+# Selected for: tight spreads, S/R respect, volatility for 1:3 RR
+SUPPORTED_PAIRS: list[str] = [
+    "GBPUSD", "GBPJPY", "USDJPY",
+    "EURUSD", "AUDUSD", "USDCAD",
+    "EURGBP", "EURJPY",
+]
 
-# Pip sizes: GBPUSD=4th decimal, JPY pairs=2nd decimal
+# Pip sizes: XXX/USD=4th decimal, JPY pairs=2nd decimal
 PIP_SIZES: dict[str, float] = {
     "GBPUSD": 0.0001,
     "GBPJPY": 0.01,
     "USDJPY": 0.01,
+    "EURUSD": 0.0001,
+    "AUDUSD": 0.0001,
+    "USDCAD": 0.0001,
+    "EURGBP": 0.0001,
+    "EURJPY": 0.01,
 }
 
 # MT5 magic number identifying bot orders

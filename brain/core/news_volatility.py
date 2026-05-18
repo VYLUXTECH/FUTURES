@@ -19,7 +19,7 @@ from config.constants import (
 
 logger = logging.getLogger(__name__)
 
-_WATCHED_CURRENCIES: frozenset[str] = frozenset({"GBP", "JPY", "USD", "EUR"})
+_WATCHED_CURRENCIES: frozenset[str] = frozenset({"GBP", "JPY", "USD", "EUR", "CAD", "AUD", "NZD", "CHF"})
 
 _NEWS_LOCK = threading.Lock()
 
