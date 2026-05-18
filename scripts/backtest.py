@@ -68,7 +68,7 @@ mt5 = MockMT5()
 sys.modules["MetaTrader5"] = mt5
 
 # ── Import brain modules ───────────────────────────────────
-from config.constants import SUPPORTED_PAIRS, PIP_SIZES, TARGET_RR, SESSION_START_UTC, SESSION_END_UTC
+from config.constants import SUPPORTED_PAIRS, PIP_SIZES, TARGET_RR, SESSION_START_UTC, SESSION_END_UTC, ENABLE_SELL_TRADES
 from sectors import s1_candle, s2_structure, s3_levels, s4_rejections, s5_imbalances, s6_htf_structure, s7_tf_correlation
 
 # ── Patch s8_bias to allow SELL signals ────────────────────
@@ -83,6 +83,9 @@ def synthesize_allow_sell(pair, s1, s2, s3, s4, s5, s6, s7, tick_ask, tick_bid):
     if s4_dir != s1_dir or s1_dir == "NEUTRAL":
         return _neutral()
     direction = s1_dir
+
+    if not ENABLE_SELL_TRADES and direction == "SELL":
+        return _neutral()
 
     htf_bias = s6.get("htf_bias", "NEUTRAL")
     if direction == "BUY" and htf_bias == "BEARISH":
@@ -152,7 +155,7 @@ def _calc_confidence(confirmations, s1, s2, s3, s4, s5, s6, s7):
     s1_press = s1.get("pressure", "MEDIUM")
     if s1_mom in ("HIGH", "MEDIUM") and s1_press == "HIGH": base += 10
     s4_quality = int(s4.get("wick_ratio", 0) * 30)
-    fvg_bonus = 8 if s5.get("fvg_found") and s5.get("direction") in ("BUY", "SELL") else 0
+    fvg_bonus = 8 if s5.get("fvg_found") else 0
     align_penalty = -8 if s7.get("alignment") != "SAFE" else 5
     mom_bonus = 8 if "LOW_TO" in s3.get("momentum_of_approach", "") else 0
     shift_bonus = 10 if s2.get("shift") else 0

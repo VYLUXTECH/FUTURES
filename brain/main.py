@@ -14,19 +14,6 @@ import MetaTrader5 as mt5
 
 ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:8081").split(",") if o.strip()]
 
-app = FastAPI(
-    title="FuturesBrain API",
-    version="2.0.0",
-    description="Price Action S/R Scalping Bot — 1:3 RR",
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-    allow_credentials=True,
-)
 from config.constants import SUPPORTED_PAIRS, PIP_SIZES, API_HOST, API_PORT, SESSION_START_UTC, SESSION_END_UTC, MAX_DAILY_TRADES
 from core.pipeline import run as pipeline_run
 from core.executor import place_order, modify_sl_to_break_even
@@ -63,9 +50,10 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    allow_credentials=True,
 )
 
 app.include_router(router)
@@ -73,7 +61,6 @@ set_bot_state_ref(_bot_state)
 
 
 def _fetch_mt5_creds_from_supabase() -> tuple[int, str, str] | None:
-    """Read MT5 credentials from Supabase mt5_credentials table."""
     if not SUPABASE_DB_URI:
         return None
     try:
@@ -100,7 +87,6 @@ def _fetch_mt5_creds_from_supabase() -> tuple[int, str, str] | None:
 
 
 def get_mt5_creds() -> tuple[int, str, str]:
-    """Return MT5 credentials from Supabase only."""
     supabase_creds = _fetch_mt5_creds_from_supabase()
     if supabase_creds:
         return supabase_creds
@@ -159,6 +145,16 @@ def has_open_position() -> bool:
     except Exception:
         return bool(get_open_trades())
     return False
+
+
+def count_open_positions() -> int:
+    try:
+        positions = mt5.positions_get()
+        if positions is None:
+            return 0
+        return sum(1 for p in positions if p.symbol in SUPPORTED_PAIRS)
+    except Exception:
+        return len(get_open_trades())
 
 
 def monitor_positions(risk: RiskEngine) -> None:
@@ -290,42 +286,55 @@ def trading_loop() -> None:
                 signal["_pair"] = pair
                 signals.append(signal)
             except Exception as exc:
-                logger.error("Pipeline error for %s: %s", pair, exc)
+                logger.error("Pipeline error for %s: %s", pair, exc, exc_info=True)
                 continue
 
-        best = pick_best_signal(signals)
-        if best is None:
+        if trading_mode == "long":
+            open_count = count_open_positions()
+            max_concurrent = _bot_state.get("max_concurrent", 3)
+            signals = signals[:max_concurrent - open_count]
+            signals.sort(key=lambda s: s.get("confidence", 0), reverse=True)
+        else:
+            best = pick_best_signal(signals)
+            signals = [best] if best else []
+
+        if not signals:
             elapsed = time.monotonic() - cycle_start
             sleep_for = max(0.0, SCAN_INTERVAL_SECS - elapsed)
             _stop_event.wait(timeout=sleep_for)
             continue
 
-        pair = best["_pair"]
-        sl_pips = best["sl_pips"]
-        trading_mode = _bot_state.get("trading_mode", "short")
-        auto_compound = _bot_state.get("auto_compounding", False) and trading_mode == "long"
-        lots = risk.calculate_lot(pair, account_balance, sl_pips, risk_percent, auto_compound=auto_compound)
-        logger.info("Best signal: %s %s | conf=%d | lots=%.2f", best["direction"], pair, best["confidence"], lots)
+        for signal in signals:
+            if _stop_event.is_set():
+                break
+            pair = signal["_pair"]
+            sl_pips = signal["sl_pips"]
+            auto_compound = _bot_state.get("auto_compounding", False) and trading_mode == "long"
+            lots = risk.calculate_lot(pair, account_balance, sl_pips, risk_percent, auto_compound=auto_compound)
+            logger.info("Executing: %s %s | conf=%d | lots=%.2f", signal["direction"], pair, signal["confidence"], lots)
 
-        try:
-            result = place_order(
-                pair=pair,
-                direction=best["direction"],
-                lots=lots,
-                entry_price=best["entry_price"],
-                sl_price=best["stop_loss"],
-                tp_price=best["take_profit"],
-                confidence=best["confidence"],
-                sectors=best["sectors"],
-                supabase_uri=SUPABASE_DB_URI,
-            )
-            if result:
-                logger.info("Trade executed | ticket=%s | %s %s | conf=%d%% | lots=%.2f",
-                            result["ticket"], best["direction"], pair, best["confidence"], lots)
-            else:
-                logger.warning("Order placement returned None for %s", pair)
-        except Exception as exc:
-            logger.error("Execution error for %s: %s", pair, exc)
+            try:
+                result = place_order(
+                    pair=pair,
+                    direction=signal["direction"],
+                    lots=lots,
+                    entry_price=signal["entry_price"],
+                    sl_price=signal["stop_loss"],
+                    tp_price=signal["take_profit"],
+                    confidence=signal["confidence"],
+                    sectors=signal["sectors"],
+                    supabase_uri=SUPABASE_DB_URI,
+                )
+                if result:
+                    logger.info("Trade executed | ticket=%s | %s %s | conf=%d%% | lots=%.2f",
+                                result["ticket"], signal["direction"], pair, signal["confidence"], lots)
+                else:
+                    logger.warning("Order placement returned None for %s", pair)
+            except Exception as exc:
+                logger.error("Execution error for %s: %s", pair, exc, exc_info=True)
+
+            if trading_mode == "short":
+                break
 
         elapsed = time.monotonic() - cycle_start
         sleep_for = max(0.0, SCAN_INTERVAL_SECS - elapsed)
@@ -347,7 +356,6 @@ signal.signal(signal.SIGTERM, _handle_signal)
 
 
 def _start_trading_thread() -> None:
-    """Start the trading loop in a dedicated thread."""
     thread = threading.Thread(
         target=trading_loop,
         name="trading_loop",
@@ -389,4 +397,4 @@ if __name__ == "__main__":
         log_config=None,
         reload=False,
         workers=1,
-    )
+   )

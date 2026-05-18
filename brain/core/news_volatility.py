@@ -1,13 +1,3 @@
-# ============================================================
-# FuturesBrain v1.0 – News & Volatility Filter
-# BUG FIXES:
-#   • mt5.calendar_get_events() → mt5.calendar_history_get()
-#   • NamedTuple attribute access (e.id not e["id"])
-#   • MT5NewsFilter() was re-instantiated per allow_trade() call
-#     (now created once in RiskEngine.__init__)
-#   • Added country→currency mapping for all three pairs
-#   • SQLite news cache uses thread-safe context manager
-# ============================================================
 from __future__ import annotations
 
 import logging
@@ -24,14 +14,13 @@ from config.constants import (
     NEWS_IMPORTANCE_HIGH,
     NEWS_WINDOW_MINUTES,
     SQLITE_NEWS_DB,
+    POST_NEWS_COOLDOWN_MINUTES,
 )
 
 logger = logging.getLogger(__name__)
 
-# Currencies we care about, derived from SUPPORTED_PAIRS
-_WATCHED_CURRENCIES: frozenset[str] = frozenset({"GBP", "JPY", "USD"})
+_WATCHED_CURRENCIES: frozenset[str] = frozenset({"GBP", "JPY", "USD", "EUR"})
 
-# Write lock for news SQLite
 _NEWS_LOCK = threading.Lock()
 
 
@@ -46,17 +35,12 @@ def _news_conn() -> Generator[sqlite3.Connection, None, None]:
 
 
 class MT5NewsFilter:
-    """
-    Fetches high-impact economic events via the MT5 native calendar API
-    and caches them locally in a SQLite DB.
-
-    Instantiate ONCE (in RiskEngine.__init__) – not per trade check.
-    """
 
     def __init__(self) -> None:
         self._init_db()
-
-    # ── Internal DB ───────────────────────────────────────────
+        self._last_refresh: datetime | None = None
+        self._refresh_interval = timedelta(minutes=15)
+        self._post_news_until: datetime | None = None
 
     def _init_db(self) -> None:
         with _NEWS_LOCK, _news_conn() as conn:
@@ -73,34 +57,27 @@ class MT5NewsFilter:
             )
             conn.commit()
 
-    # ── MT5 Calendar Refresh ───────────────────────────────────
-
-    def refresh(self, hours_ahead: int = 4) -> int:
-        """
-        Pull upcoming high-impact events from MT5 native calendar.
-        Returns number of events cached.
-
-        MT5 calendar_history_get() returns CalendarValue NamedTuples.
-        We use getattr() with fallbacks because field names vary across
-        MT5 Python library versions.
-        """
+    def refresh(self, hours_ahead: int = 4, force: bool = False) -> int:
         now = datetime.now(timezone.utc)
+        if not force and self._last_refresh and (now - self._last_refresh) < self._refresh_interval:
+            return self._count_cached(now)
+
         end = now + timedelta(hours=hours_ahead)
 
         try:
-            # ── FIX: correct API function name ─────────────────
             events = mt5.calendar_history_get(now, end)
         except Exception as exc:
             logger.warning("MT5 calendar unavailable: %s", exc)
             return 0
 
         if not events:
+            self._last_refresh = now
             return 0
 
         count = 0
         with _NEWS_LOCK, _news_conn() as conn:
+            conn.execute("DELETE FROM events WHERE event_time < ?", (now.isoformat(),))
             for e in events:
-                # ── FIX: NamedTuple → attribute access, not dict ────
                 importance = getattr(e, "importance", getattr(e, "importance_type", 0))
                 if int(importance) < NEWS_IMPORTANCE_HIGH:
                     continue
@@ -114,7 +91,6 @@ class MT5NewsFilter:
                 if not evt_time:
                     continue
 
-                # Make timezone-aware if naive
                 if evt_time.tzinfo is None:
                     evt_time = evt_time.replace(tzinfo=timezone.utc)
 
@@ -133,16 +109,24 @@ class MT5NewsFilter:
 
             conn.commit()
 
+        self._last_refresh = now
         logger.debug("MT5 calendar: cached %d high-impact events", count)
         return count
 
-    # ── News Check ────────────────────────────────────────────
+    def _count_cached(self, now: datetime) -> int:
+        window_start = (now - timedelta(minutes=NEWS_WINDOW_MINUTES)).isoformat()
+        window_end = (now + timedelta(minutes=NEWS_WINDOW_MINUTES)).isoformat()
+        placeholders = ",".join("?" * len(_WATCHED_CURRENCIES))
+        with _news_conn() as conn:
+            row = conn.execute(
+                f"""SELECT COUNT(*) FROM events
+                    WHERE currency IN ({placeholders})
+                    AND event_time BETWEEN ? AND ?""",
+                (*_WATCHED_CURRENCIES, window_start, window_end),
+            ).fetchone()
+        return row[0] if row else 0
 
     def is_news_window(self, pair: str) -> bool:
-        """
-        Return True if any high-impact event for this pair's currencies
-        falls within ±NEWS_WINDOW_MINUTES of now.
-        """
         currencies = _pair_to_currencies(pair)
         now = datetime.now(timezone.utc)
         window_start = (now - timedelta(minutes=NEWS_WINDOW_MINUTES)).isoformat()
@@ -159,25 +143,29 @@ class MT5NewsFilter:
 
         result = bool(row and row[0] > 0)
         if result:
-            logger.info("📰 News window active for %s – skipping trade", pair)
-        return result
+            logger.info("News window active for %s – skipping trade", pair)
+            return True
+
+        if self._post_news_until and now < self._post_news_until:
+            remaining = int((self._post_news_until - now).total_seconds() / 60)
+            logger.info("Post-news cooldown for %s (%dm remaining) – skipping", pair, remaining)
+            return True
+
+        return False
+
+    def record_event_passed(self) -> None:
+        now = datetime.now(timezone.utc)
+        self._post_news_until = now + timedelta(minutes=POST_NEWS_COOLDOWN_MINUTES)
+        logger.info("Post-news cooldown set until %s", self._post_news_until.isoformat())
 
 
 def _pair_to_currencies(pair: str) -> list[str]:
-    """Split e.g. 'GBPUSD' → ['GBP', 'USD']."""
     if len(pair) >= 6:
         return [pair[:3].upper(), pair[3:6].upper()]
     return [pair.upper()]
 
 
-# ── ATR Volatility Tripwire ────────────────────────────────
-
 def calculate_atr(highs, lows, closes, period: int = 14) -> float:
-    """
-    Vectorised ATR calculation (no TA-Lib dependency).
-    Uses Wilder's smoothing (EWM with adjust=False).
-    Returns the most recent ATR value or 0.0 on failure.
-    """
     import pandas as pd
     import numpy as np
 

@@ -98,6 +98,16 @@ def has_open_position() -> bool:
     return False
 
 
+def count_open_positions() -> int:
+    try:
+        positions = mt5.positions_get()
+        if positions is None:
+            return 0
+        return sum(1 for p in positions if p.symbol in SUPPORTED_PAIRS)
+    except Exception:
+        return len(get_open_trades())
+
+
 def pick_best_signal(signals: list[dict]) -> dict | None:
     if not signals:
         return None
@@ -376,33 +386,49 @@ def trading_loop() -> None:
             except Exception as exc:
                 logger.error("Pipeline error for %s: %s", pair, exc, exc_info=True)
                 continue
-        best = pick_best_signal(signals)
-        if best is None:
+
+        if trading_mode == "long":
+            open_count = count_open_positions()
+            max_concurrent = _bot_state.get("max_concurrent", 3)
+            signals = signals[:max_concurrent - open_count]
+            signals.sort(key=lambda s: s.get("confidence", 0), reverse=True)
+        else:
+            best = pick_best_signal(signals)
+            signals = [best] if best else []
+
+        if not signals:
             elapsed = time.monotonic() - cycle_start
             sleep_for = max(0.0, LOOP_INTERVAL_SECS - elapsed)
             _stop_event.wait(timeout=sleep_for)
             continue
-        pair = best["_pair"]
-        sl_pips = best["sl_pips"]
-        trading_mode = _bot_state.get("trading_mode", "short")
-        auto_compound = _bot_state.get("auto_compounding", False) and trading_mode == "long"
-        lots = risk.calculate_lot(pair, account_balance, sl_pips, risk_percent, auto_compound=auto_compound)
-        logger.info("Best signal: %s %s | conf=%d | lots=%.2f", best["direction"], pair, best["confidence"], lots)
-        try:
-            result = place_order(
-                pair=pair, direction=best["direction"],
-                lots=lots, entry_price=best["entry_price"],
-                sl_price=best["stop_loss"], tp_price=best["take_profit"],
-                confidence=best["confidence"], sectors=best["sectors"],
-                supabase_uri=SUPABASE_DB_URI,
-            )
-            if result:
-                logger.info("Trade executed | ticket=%s | %s %s | conf=%d%% | lots=%.2f",
-                            result["ticket"], best["direction"], pair, best["confidence"], lots)
-            else:
-                logger.warning("Order placement returned None for %s", pair)
-        except Exception as exc:
-            logger.error("Execution error for %s: %s", pair, exc, exc_info=True)
+
+        for signal in signals:
+            if _stop_event.is_set():
+                break
+            pair = signal["_pair"]
+            sl_pips = signal["sl_pips"]
+            auto_compound = _bot_state.get("auto_compounding", False) and trading_mode == "long"
+            lots = risk.calculate_lot(pair, account_balance, sl_pips, risk_percent, auto_compound=auto_compound)
+            logger.info("Executing: %s %s | conf=%d | lots=%.2f", signal["direction"], pair, signal["confidence"], lots)
+            try:
+                result = place_order(
+                    pair=pair, direction=signal["direction"],
+                    lots=lots, entry_price=signal["entry_price"],
+                    sl_price=signal["stop_loss"], tp_price=signal["take_profit"],
+                    confidence=signal["confidence"], sectors=signal["sectors"],
+                    supabase_uri=SUPABASE_DB_URI,
+                )
+                if result:
+                    logger.info("Trade executed | ticket=%s | %s %s | conf=%d%% | lots=%.2f",
+                                result["ticket"], signal["direction"], pair, signal["confidence"], lots)
+                else:
+                    logger.warning("Order placement returned None for %s", pair)
+            except Exception as exc:
+                logger.error("Execution error for %s: %s", pair, exc, exc_info=True)
+
+            if trading_mode == "short":
+                break
+
         elapsed = time.monotonic() - cycle_start
         sleep_for = max(0.0, LOOP_INTERVAL_SECS - elapsed)
         _stop_event.wait(timeout=sleep_for)

@@ -1,14 +1,3 @@
-# ============================================================
-# FuturesBrain v1.0 – Trade Executor
-# BUG FIXES:
-#   • SL/TP now uses ABSOLUTE prices, not (pips × point)
-#     point is 0.00001 for 5-digit brokers; multiplying pip
-#     counts by it gave ~10× wrong distances
-#   • modify_sl_to_break_even buffer calculation fixed
-#   • Full retcode handling with retry on REQUOTE / PRICE_CHANGED
-#   • ORDER_FILLING_IOC fallback when FOK rejected
-#   • Trailing stop logic uses ATR correctly
-# ============================================================
 from __future__ import annotations
 
 import json
@@ -24,6 +13,8 @@ from config.constants import (
     PIP_SIZES,
     TRAILING_ATR_MULT,
     TRAILING_TRIGGER_PIPS,
+    MAX_SPREAD_PIPS,
+    MAX_SLIPPAGE_PIPS,
 )
 from db import sync_trade, get_state
 
@@ -31,7 +22,6 @@ logger = logging.getLogger(__name__)
 
 DRY_RUN_KEY = "dry_run"
 
-# Retcodes that justify a retry (price moved, not a logic error)
 _RETRYABLE_RETCODES: frozenset[int] = frozenset({
     mt5.TRADE_RETCODE_REQUOTE,
     mt5.TRADE_RETCODE_PRICE_CHANGED,
@@ -42,6 +32,19 @@ _RETRYABLE_RETCODES: frozenset[int] = frozenset({
 })
 
 Direction = Literal["BUY", "SELL"]
+
+
+def _check_spread_ok(pair: str) -> tuple[bool, float]:
+    tick = mt5.symbol_info_tick(pair)
+    if tick is None:
+        return False, 0.0
+    info = mt5.symbol_info(pair)
+    if info is None:
+        return False, 0.0
+    point = info.point or 0.00001
+    pip_size = PIP_SIZES.get(pair, 0.0001)
+    spread_pips = (tick.spread * point) / pip_size
+    return spread_pips <= MAX_SPREAD_PIPS, spread_pips
 
 
 def place_order(
@@ -55,17 +58,12 @@ def place_order(
     sectors: dict,
     supabase_uri: str | None = None,
     max_retries: int = 3,
-    slippage_pips: float = 3.0,
+    slippage_pips: float | None = None,
 ) -> dict | None:
-    """
-    Place a market order with SL and TP as ABSOLUTE price levels.
+    if slippage_pips is None:
+        from config.constants import MAX_SLIPPAGE_PIPS
+        slippage_pips = MAX_SLIPPAGE_PIPS
 
-    BUG FIX: Previous code multiplied pips by `point` (0.00001) producing
-    wildly wrong SL/TP levels. Entry/SL/TP must be absolute prices as
-    calculated by the pipeline from key levels.
-
-    Returns the MT5 order result dict, or None on failure.
-    """
     if get_state(DRY_RUN_KEY, default=False):
         logger.info(
             "DRY RUN | %s %s | lots=%.2f | entry=%.5f | sl=%.5f | tp=%.5f | conf=%d%%",
@@ -91,16 +89,32 @@ def place_order(
         logger.error("No tick data for %s", pair)
         return None
 
+    spread_ok, spread_pips = _check_spread_ok(pair)
+    if not spread_ok:
+        logger.warning(
+            "Spread too wide for %s: %.1f pips > %.1f max – aborting order",
+            pair, spread_pips, MAX_SPREAD_PIPS,
+        )
+        return None
+
     order_type = mt5.ORDER_TYPE_BUY if direction == "BUY" else mt5.ORDER_TYPE_SELL
     exec_price = tick.ask if direction == "BUY" else tick.bid
     pip_size = PIP_SIZES.get(pair, 0.0001)
 
-    # Deviation in POINTS (smallest MT5 unit), not pips
     info = mt5.symbol_info(pair)
     if info is None:
         return None
     point = info.point or 0.00001
     deviation = int((slippage_pips * pip_size) / point)
+
+    commission = getattr(info, "trade_commission", 0.0) or 0.0
+    swap_long = getattr(info, "swap_long", 0.0) or 0.0
+    swap_short = getattr(info, "swap_short", 0.0) or 0.0
+    if commission or swap_long or swap_short:
+        logger.debug(
+            "Costs for %s | commission=%.2f | swap_long=%.2f | swap_short=%.2f",
+            pair, commission, swap_long, swap_short,
+        )
 
     request: dict = {
         "action":        mt5.TRADE_ACTION_DEAL,
@@ -127,10 +141,10 @@ def place_order(
 
         if result.retcode == mt5.TRADE_RETCODE_DONE:
             logger.info(
-                "✅ Order placed | %s %s | ticket=%d | lots=%.2f | entry=%.5f "
-                "| sl=%.5f | tp=%.5f | conf=%d%%",
+                "Order placed | %s %s | ticket=%d | lots=%.2f | entry=%.5f "
+                "| sl=%.5f | tp=%.5f | conf=%d%% | spread=%.1fp",
                 direction, pair, result.order, lots,
-                exec_price, sl_price, tp_price, confidence,
+                exec_price, sl_price, tp_price, confidence, spread_pips,
             )
             sync_trade(
                 ticket=result.order, pair=pair, direction=direction,
@@ -144,7 +158,6 @@ def place_order(
             return {"ticket": result.order, "entry": exec_price, "retcode": result.retcode}
 
         if result.retcode in _RETRYABLE_RETCODES:
-            # Refresh price and retry
             tick = mt5.symbol_info_tick(pair)
             if tick:
                 request["price"] = tick.ask if direction == "BUY" else tick.bid
@@ -155,15 +168,13 @@ def place_order(
             time.sleep(0.3 * attempt)
             continue
 
-        # ORDER_FILLING_FOK rejected by some brokers – try IOC
         if result.retcode == mt5.TRADE_RETCODE_INVALID_FILL:
             request["type_filling"] = mt5.ORDER_FILLING_IOC
             logger.warning("FOK fill rejected – switching to IOC")
             continue
 
-        # Non-retryable failure
         logger.error(
-            "❌ Order failed | retcode=%d | comment=%s | pair=%s %s",
+            "Order failed | retcode=%d | comment=%s | pair=%s %s",
             result.retcode, result.comment, direction, pair,
         )
         break
@@ -178,10 +189,6 @@ def close_position(
     lots: float,
     supabase_uri: str | None = None,
 ) -> bool:
-    """
-    Close an open position by ticket.
-    Returns True on success.
-    """
     tick = mt5.symbol_info_tick(pair)
     if tick is None:
         return False
@@ -216,11 +223,11 @@ def close_position(
             status="CLOSED", opened_at="", closed_at=datetime.now(timezone.utc).isoformat(),
             confidence=0, uri=supabase_uri,
         )
-        logger.info("✅ Position closed | ticket=%d | pnl=%.2f", ticket, pnl)
+        logger.info("Position closed | ticket=%d | pnl=%.2f", ticket, pnl)
         return True
 
     logger.error(
-        "❌ Close failed | ticket=%d | retcode=%s",
+        "Close failed | ticket=%d | retcode=%s",
         ticket, getattr(result, "retcode", "None"),
     )
     return False
@@ -236,11 +243,6 @@ def modify_sl_to_break_even(
     be_trigger_price: float | None = None,
     pip_size: float | None = None,
 ) -> bool:
-    """
-    Move SL to break-even when price reaches the S8-identified BE trigger
-    level (first key level between entry and TP), OR at 5 pips profit as
-    a safety fallback.
-    """
     if pip_size is None:
         pip_size = PIP_SIZES.get(pair, 0.0001)
     buffer_price = buffer_pips * pip_size
@@ -294,10 +296,6 @@ def update_trailing_stop(
     direction: Direction,
     current_atr: float,
 ) -> bool:
-    """
-    Arm and update trailing stop when +TRAILING_TRIGGER_PIPS profit reached.
-    Trail distance = ATR × TRAILING_ATR_MULT.
-    """
     pip_size = PIP_SIZES.get(pair, 0.0001)
     profit_pips = (
         (current_price - entry_price) if direction == "BUY"
@@ -307,7 +305,7 @@ def update_trailing_stop(
     if profit_pips < TRAILING_TRIGGER_PIPS:
         return False
 
-    trail_distance = current_atr * TRAILING_ATR_MULT   # absolute price
+    trail_distance = current_atr * TRAILING_ATR_MULT
 
     positions = mt5.positions_get(ticket=ticket)
     if not positions:
@@ -334,14 +332,13 @@ def update_trailing_stop(
     ok = result is not None and result.retcode == mt5.TRADE_RETCODE_DONE
     if ok:
         logger.debug(
-            "🔁 Trailing stop updated | ticket=%d | new_sl=%.5f | trail_dist=%.5f",
+            "Trailing stop updated | ticket=%d | new_sl=%.5f | trail_dist=%.5f",
             ticket, new_sl, trail_distance,
         )
     return ok
 
 
 def _get_position_pnl(ticket: int) -> float:
-    """Attempt to retrieve closed-deal profit from MT5 history."""
     try:
         since = datetime(2020, 1, 1, tzinfo=timezone.utc)
         deals = mt5.history_deals_get(since, datetime.now(timezone.utc))

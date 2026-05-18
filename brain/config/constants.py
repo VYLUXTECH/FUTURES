@@ -78,6 +78,16 @@ TF_STRINGS: list[str] = [
     "1m", "3m", "5m", "15m", "30m", "1H", "4H", "1D", "1W", "1M"
 ]
 
+# ── Execution Safeguards ───────────────────────────────────
+MAX_SPREAD_PIPS: float = 3.0          # reject trade if spread > this
+MAX_SLIPPAGE_PIPS: float = 3.0        # allowed slippage in pips
+POST_NEWS_COOLDOWN_MINUTES: int = 30  # cool down after news event passes
+COMMISSION_PER_LOT: float = 7.0       # typical round-turn commission (USD)
+ESTIMATED_SWAP_PER_NIGHT: float = 0.5 # estimated swap cost in pips equivalent
+
+# ── SELL Trade Toggle ──────────────────────────────────────
+ENABLE_SELL_TRADES: bool = True       # set False to disable SELL signals
+
 # ── FastAPI ────────────────────────────────────────────────
 API_HOST: str = "0.0.0.0"
 API_PORT: int = 8000
