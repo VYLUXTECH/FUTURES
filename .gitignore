@@ -63,3 +63,4 @@ htmlcov/
 
 # Testing
 .pytest_cache/
+.idx/

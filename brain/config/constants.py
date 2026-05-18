@@ -15,7 +15,6 @@ APP_NAME: str = "FuturesBrain"
 SUPPORTED_PAIRS: list[str] = [
     "GBPUSD", "GBPJPY", "USDJPY",
     "EURUSD", "AUDUSD", "USDCAD",
-    "EURGBP", "EURJPY",
 ]
 
 # Pip sizes: XXX/USD=4th decimal, JPY pairs=2nd decimal
@@ -26,8 +25,6 @@ PIP_SIZES: dict[str, float] = {
     "EURUSD": 0.0001,
     "AUDUSD": 0.0001,
     "USDCAD": 0.0001,
-    "EURGBP": 0.0001,
-    "EURJPY": 0.01,
 }
 
 # MT5 magic number identifying bot orders
@@ -98,7 +95,7 @@ COMMISSION_PER_LOT: float = 7.0       # typical round-turn commission (USD)
 ESTIMATED_SWAP_PER_NIGHT: float = 0.5 # estimated swap cost in pips equivalent
 
 # ── SELL Trade Toggle ──────────────────────────────────────
-ENABLE_SELL_TRADES: bool = True       # set False to disable SELL signals
+ENABLE_SELL_TRADES: bool = False      # set False to disable SELL signals
 
 # ── FastAPI ────────────────────────────────────────────────
 API_HOST: str = "0.0.0.0"
