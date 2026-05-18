@@ -87,13 +87,25 @@ def synthesize_allow_sell(pair, s1, s2, s3, s4, s5, s6, s7, tick_ask, tick_bid):
     if not ENABLE_SELL_TRADES and direction == "SELL":
         return _neutral()
 
+    wick_ratio = s4.get("wick_ratio", 0.0)
+    if direction == "SELL" and wick_ratio < 0.55:
+        return _neutral()
+    if direction == "BUY" and wick_ratio < 0.45:
+        return _neutral()
+
     htf_bias = s6.get("htf_bias", "NEUTRAL")
     if direction == "BUY" and htf_bias == "BEARISH":
         return _neutral()
-    if direction == "SELL" and htf_bias == "BULLISH":
+    if direction == "SELL" and htf_bias != "BEARISH":
         return _neutral()
-    if htf_bias not in ("BULLISH", "BEARISH", "NEUTRAL"):
-        return _neutral()
+
+    weekly = s6.get("directional_bias", {}).get("weekly_bias", "NEUTRAL")
+    monthly = s6.get("directional_bias", {}).get("monthly_bias", "NEUTRAL")
+    if direction == "SELL":
+        if weekly in ("BULLISH", "MILD_BULLISH") or monthly in ("BULLISH", "MILD_BULLISH"):
+            return _neutral()
+        if weekly == "NEUTRAL" and monthly == "NEUTRAL":
+            return _neutral()
 
     mom = s3.get("momentum_of_approach", "NEUTRAL")
     if direction == "BUY" and mom == "HIGH_TO_SUP":
@@ -101,8 +113,22 @@ def synthesize_allow_sell(pair, s1, s2, s3, s4, s5, s6, s7, tick_ask, tick_bid):
     if direction == "SELL" and mom == "HIGH_TO_RES":
         return _neutral()
 
+    if direction == "SELL":
+        s2_dir = s2.get("direction", "NEUTRAL")
+        s2_struct = s2.get("structure", "UNKNOWN")
+        if s2_dir != "SELL":
+            return _neutral()
+        if s2_struct not in ("BOS", "RESPECT"):
+            return _neutral()
+
     confirmations = _count_confirmations(direction, s2, s5, s7)
-    if confirmations < 1:
+    if direction == "SELL" and confirmations < 2:
+        return _neutral()
+    if direction == "BUY" and confirmations < 1:
+        return _neutral()
+
+    alignment = s7.get("alignment", "NEUTRAL")
+    if direction == "SELL" and alignment != "SAFE":
         return _neutral()
 
     entry_price = s4.get("level", tick_ask if direction == "BUY" else tick_bid)
@@ -117,15 +143,16 @@ def synthesize_allow_sell(pair, s1, s2, s3, s4, s5, s6, s7, tick_ask, tick_bid):
         tp_distance = sl_pips * 3.0
         take_profit = entry_price + tp_distance * pip_size
     else:
-        sl_raw = max(rejection_level, candle_ref) + 2 * pip_size
+        sl_raw = max(rejection_level, candle_ref) + 3 * pip_size
         sl_pips = abs(entry_price - sl_raw) / pip_size
         sl_pips = max(sl_pips, 5.0)
         stop_loss = entry_price + sl_pips * pip_size
         tp_distance = sl_pips * 3.0
         take_profit = entry_price - tp_distance * pip_size
 
-    confidence = _calc_confidence(confirmations, s1, s2, s3, s4, s5, s6, s7)
-    if confidence < 45:
+    confidence = _calc_confidence(direction, confirmations, s1, s2, s3, s4, s5, s6, s7)
+    min_conf = 60 if direction == "SELL" else 45
+    if confidence < min_conf:
         return _neutral()
 
     return {
@@ -147,7 +174,7 @@ def _count_confirmations(direction, s2, s5, s7):
     if s7.get("direction_consensus") == direction: count += 1
     return count
 
-def _calc_confidence(confirmations, s1, s2, s3, s4, s5, s6, s7):
+def _calc_confidence(direction, confirmations, s1, s2, s3, s4, s5, s6, s7):
     base = 55
     if confirmations >= 4: base += 15
     elif confirmations >= 3: base += 10
@@ -155,7 +182,7 @@ def _calc_confidence(confirmations, s1, s2, s3, s4, s5, s6, s7):
     s1_press = s1.get("pressure", "MEDIUM")
     if s1_mom in ("HIGH", "MEDIUM") and s1_press == "HIGH": base += 10
     s4_quality = int(s4.get("wick_ratio", 0) * 30)
-    fvg_bonus = 8 if s5.get("fvg_found") else 0
+    fvg_bonus = 8 if s5.get("fvg_found") and s5.get("direction") == direction else 0
     align_penalty = -8 if s7.get("alignment") != "SAFE" else 5
     mom_bonus = 8 if "LOW_TO" in s3.get("momentum_of_approach", "") else 0
     shift_bonus = 10 if s2.get("shift") else 0
