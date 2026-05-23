@@ -80,15 +80,6 @@ if (-not (Test-Path "$ROOT\requirements.txt")) {
 }
 Write-Host "  Repository cloned." -ForegroundColor Green
 Set-Location $ROOT
-        git pull
-    }
-}
-
-if (-not (Test-Path $ROOT)) {
-    git clone $REPO $ROOT
-    Write-Host "  Repository cloned." -ForegroundColor Green
-}
-Set-Location $ROOT
 
 # ---- Install Python deps -------------------------------------------
 Write-Host ""
