@@ -72,7 +72,7 @@ if (Test-Path $ROOT) {
         Start-Sleep -Seconds 3
         $retries--
     }
-    if (Test-Path $ROOT)) {
+    if (Test-Path $ROOT) {
         Write-Host "  ERROR: Cannot delete $ROOT - files locked by system." -ForegroundColor Red
         Write-Host "  Reboot the VPS and run the script again." -ForegroundColor Red
         exit 1
