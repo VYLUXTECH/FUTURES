@@ -5,5 +5,5 @@ Start-Sleep -Seconds 2
 Remove-Item "$env:TEMP\setup.ps1" -Force -ErrorAction SilentlyContinue
 $wc = New-Object System.Net.WebClient
 $wc.Headers.Add("Cache-Control", "no-cache")
-$wc.DownloadFile("https://raw.githubusercontent.com/VYLUXTECHINC/FUTURES/9d9085a/scripts/setup-vps.ps1", "$env:TEMP\setup.ps1")
+$wc.DownloadFile("https://raw.githubusercontent.com/VYLUXTECHINC/FUTURES/b9b5378/scripts/setup-vps.ps1", "$env:TEMP\setup.ps1")
 & "$env:TEMP\setup.ps1"
