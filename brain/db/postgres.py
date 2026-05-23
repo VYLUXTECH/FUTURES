@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 
-from config.settings import SUPABASE_DB_URI
+from brain.config.settings import SUPABASE_DB_URI
 
 logger = logging.getLogger(__name__)
 

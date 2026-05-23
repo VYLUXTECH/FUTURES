@@ -16,8 +16,8 @@ from pathlib import Path
 import MetaTrader5 as mt5
 import pandas as pd
 
-from config.constants import SUPPORTED_PAIRS
-from utils.mt5_helper import ensure_symbol
+from brain.config.constants import SUPPORTED_PAIRS
+from brain.utils.mt5_helper import ensure_symbol
 
 logger = logging.getLogger(__name__)
 

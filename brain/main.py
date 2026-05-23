@@ -7,22 +7,18 @@ import logging
 from datetime import datetime, timezone
 
 import os
-import uvicorn
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 import MetaTrader5 as mt5
 
-ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:8081").split(",") if o.strip()]
-
-from config.constants import SUPPORTED_PAIRS, PIP_SIZES, API_HOST, API_PORT, SESSION_START_UTC, SESSION_END_UTC, MAX_DAILY_TRADES
-from core.pipeline import run as pipeline_run
-from core.executor import place_order, modify_sl_to_break_even
-from core.risk import RiskEngine
-from data.feed import get_candles
-from db import get_open_trades, get_user_max_daily_trades
-from api.routes import router, set_bot_state_ref
-from utils.mt5_helper import reconnect_mt5, is_connected
-from utils.logger import setup_logging
+from brain.config.constants import SUPPORTED_PAIRS, PIP_SIZES, SESSION_START_UTC, SESSION_END_UTC, MAX_DAILY_TRADES
+from brain.config.settings import SUPABASE_DB_URI, validate_required
+from brain.core.pipeline import run as pipeline_run
+from brain.core.executor import place_order, modify_sl_to_break_even
+from brain.core.risk import RiskEngine
+from brain.data.feed import get_candles
+from brain.db import get_open_trades, get_user_max_daily_trades
+from brain.api.routes import set_bot_state_ref
+from brain.utils.mt5_helper import reconnect_mt5, is_connected
+from brain.utils.logger import setup_logging
 
 setup_logging()
 logger = logging.getLogger("futuresbrain.main")
@@ -42,30 +38,13 @@ CANDLE_TF = "15m"
 SCAN_INTERVAL_SECS = 60
 MONITOR_INTERVAL_SECS = 15
 
-app = FastAPI(
-    title="FuturesBrain API",
-    version="2.0.0",
-    description="Price Action S/R Scalping Bot — 1:3 RR",
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-    allow_credentials=True,
-)
-
-app.include_router(router)
-set_bot_state_ref(_bot_state)
-
 
 def _fetch_mt5_creds_from_supabase() -> tuple[int, str, str] | None:
     if not SUPABASE_DB_URI:
         return None
     try:
-        from db.supabase import _get_conn
-        from utils.crypto import decrypt_password
+        from brain.db.supabase import _get_conn
+        from brain.utils.crypto import decrypt_password
         conn = _get_conn(SUPABASE_DB_URI)
         with conn, conn.cursor() as cur:
             cur.execute(
@@ -351,10 +330,6 @@ def _handle_signal(sig, frame) -> None:
     _bot_state["running"] = False
 
 
-signal.signal(signal.SIGINT,  _handle_signal)
-signal.signal(signal.SIGTERM, _handle_signal)
-
-
 def _start_trading_thread() -> None:
     thread = threading.Thread(
         target=trading_loop,
@@ -369,32 +344,65 @@ _bot_state["_init_mt5"] = init_mt5
 _bot_state["_start_trading"] = _start_trading_thread
 
 
-@app.on_event("startup")
-async def startup_event() -> None:
-    missing = validate_required()
-    if missing:
-        logger.warning("Missing required env vars: %s — API running without trading loop", missing)
+def create_app() -> FastAPI:
+    """Build and return the standalone FuturesBrain FastAPI app."""
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    from brain.api.routes import router
 
-    login, password, server = get_mt5_creds()
-    if login and server:
-        _start_trading_thread()
-        logger.info("FuturesBrain v2.0 started with Supabase credentials")
-    else:
-        logger.info("FuturesBrain v2.0 API started — waiting for MT5 credentials from Supabase")
+    ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:8081").split(",") if o.strip()]
 
+    app = FastAPI(
+        title="FuturesBrain API",
+        version="2.0.0",
+        description="Price Action S/R Scalping Bot — 1:3 RR",
+    )
 
-@app.on_event("shutdown")
-async def shutdown_event() -> None:
-    _stop_event.set()
-    logger.info("FastAPI shutdown – stop event set")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=ALLOWED_ORIGINS,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["*"],
+        allow_credentials=True,
+    )
+
+    app.include_router(router)
+    set_bot_state_ref(_bot_state)
+
+    @app.on_event("startup")
+    async def startup_event() -> None:
+        missing = validate_required()
+        if missing:
+            logger.warning("Missing required env vars: %s — API running without trading loop", missing)
+
+        login, password, server = get_mt5_creds()
+        if login and server:
+            _start_trading_thread()
+            logger.info("FuturesBrain v2.0 started with Supabase credentials")
+        else:
+            logger.info("FuturesBrain v2.0 API started — waiting for MT5 credentials from Supabase")
+
+    @app.on_event("shutdown")
+    async def shutdown_event() -> None:
+        _stop_event.set()
+        logger.info("FastAPI shutdown – stop event set")
+
+    return app
 
 
 if __name__ == "__main__":
+    import uvicorn
+    from brain.config.constants import API_HOST, API_PORT
+
+    signal.signal(signal.SIGINT,  _handle_signal)
+    signal.signal(signal.SIGTERM, _handle_signal)
+
+    app = create_app()
     uvicorn.run(
-        "main:app",
+        app,
         host=API_HOST,
         port=API_PORT,
         log_config=None,
         reload=False,
         workers=1,
-   )
+    )

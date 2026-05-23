@@ -11,7 +11,7 @@ import threading
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from config.settings import SUPABASE_DB_URI
+from brain.config.settings import SUPABASE_DB_URI
 
 logger = logging.getLogger(__name__)
 

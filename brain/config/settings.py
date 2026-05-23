@@ -19,10 +19,16 @@ BASE_DIR: Path = Path(__file__).resolve().parent.parent
 for _dir in ["db", "logs", "charts"]:
     (BASE_DIR / _dir).mkdir(parents=True, exist_ok=True)
 
-# ── OpenRouter ─────────────────────────────────────────────
-OPENROUTER_API_KEY: str | None = os.getenv("OPENROUTER_API_KEY")
-OPENROUTER_MODEL: str = os.getenv(
-    "OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet"
+# ── AI (Custom endpoint via all-in-1-ais) ─────────────────
+AI_BASE_URL: str = os.getenv(
+    "AI_BASE_URL", "https://all-in-1-ais.officialhectormanuel.workers.dev"
+)
+AI_MODEL: str = os.getenv("AI_MODEL", "deepseek")
+
+# ── Hugging Face (vision / chart analysis) ────────────────
+HF_TOKEN: str | None = os.getenv("HF_TOKEN")
+HF_VISION_MODEL: str = os.getenv(
+    "HF_VISION_MODEL", "Qwen/Qwen2.5-VL-72B-Instruct"
 )
 
 # ── Supabase (Transaction Pooler port 6543, IPv4) ─────────
@@ -49,6 +55,6 @@ def validate_required() -> list[str]:
     Return list of missing required env vars.
     """
     missing: list[str] = []
-    if not OPENROUTER_API_KEY:
-        missing.append("OPENROUTER_API_KEY")
+    if not AI_BASE_URL:
+        missing.append("AI_BASE_URL")
     return missing

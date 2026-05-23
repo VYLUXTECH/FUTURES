@@ -3,7 +3,7 @@ import logging
 import pandas as pd
 import numpy as np
 
-from config.constants import IGNORE_PERIODS
+from brain.config.constants import IGNORE_PERIODS
 
 logger = logging.getLogger(__name__)
 

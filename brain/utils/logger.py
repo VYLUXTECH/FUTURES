@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 import sys
-from config.settings import LOG_LEVEL, BASE_DIR
+from brain.config.settings import LOG_LEVEL, BASE_DIR
 
 
 def setup_logging() -> None:

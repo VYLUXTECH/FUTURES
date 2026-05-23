@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>FUTURES</title>
+<link rel="icon" type="image/png" href="assets/images/favicon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="splash" class="splash">
+  <div class="splash-glow"></div>
+  <div class="splash-letters">
+    <span class="spl" style="--i:0">F</span>
+    <span class="spl" style="--i:1">U</span>
+    <span class="spl" style="--i:2">T</span>
+    <span class="spl" style="--i:3">U</span>
+    <span class="spl" style="--i:4">R</span>
+    <span class="spl" style="--i:5">E</span>
+    <span class="spl" style="--i:6">S</span>
+  </div>
+  <div class="splash-motto-wrap">
+    <p class="splash-motto">PRICE IS THE ONLY INDICATOR</p>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<div id="page-auth" class="page">
+  <div class="auth-card">
+    <div class="auth-logo">FUTURES</div>
+    <p class="auth-motto">PRICE IS THE ONLY INDICATOR</p>
+    <div class="pill-tabs" id="auth-tabs">
+      <button class="pill-tab active" data-tab="login">Log In</button>
+      <button class="pill-tab" data-tab="signup">Sign Up</button>
+    </div>
+    <form id="auth-form">
+      <div id="auth-name-field" class="field-hidden">
+        <input type="text" id="auth-name" placeholder="Future Trader" class="input">
+      </div>
+      <input type="email" id="auth-email" placeholder="trader@example.com" class="input" required>
+      <input type="password" id="auth-password" placeholder="Password" class="input" required>
+      <div id="auth-confirm-field" class="field-hidden">
+        <input type="password" id="auth-confirm" placeholder="Confirm Password" class="input">
+      </div>
+      <div id="auth-agreement" class="field-hidden">
+        <label class="checkbox-label">
+          <input type="checkbox" id="auth-terms">
+          <span>I agree to the <a href="#" id="terms-link">Terms &amp; Conditions</a> and <a href="#" id="risk-link">Risk Disclosure</a></span>
+        </label>
+      </div>
+      <button type="submit" id="auth-submit" class="btn btn-primary">Log In</button>
+    </form>
+    <button id="auth-google" class="btn btn-outline">Continue with Google</button>
+    <button id="auth-forgot" class="btn btn-text">Forgot password?</button>
+    <p id="auth-error" class="error-text"></p>
+  </div>
+</div>
+
+<div id="app" class="app-hidden">
+  <header class="topbar">
+    <h1 class="topbar-logo" id="topbar-title">FUTURES</h1>
+    <div class="topbar-right">
+      <button id="theme-btn" class="btn-icon">☀️</button>
+      <button id="support-btn" class="btn-icon">🆘</button>
+      <button id="logout-btn" class="btn-icon">🚪</button>
+    </div>
+  </header>
+
+  <main class="content">
+    <div id="page-dashboard" class="page page-content">
+      <div class="card">
+        <div class="balance-row">
+          <div>
+            <div class="balance" id="dash-balance">$0</div>
+            <div class="sub-balance">
+              <span>Equity: <strong id="dash-equity">$0</strong></span>
+              <span>Margin: <strong id="dash-margin">$0</strong></span>
+            </div>
+          </div>
+          <div id="health-dot" class="health-dot green"></div>
+        </div>
+        <div class="account-type-row">
+          <span class="label-xs">Account</span>
+          <div class="type-selector" id="acct-type-selector">
+            <button class="type-btn active" data-type="Demo">Demo</button>
+            <button class="type-btn" data-type="Real">Real</button>
+          </div>
+        </div>
+        <div class="daily-limit">
+          <div class="limit-header"><span class="label-xs">Daily trades (max 5 per 24h)</span><span class="label-xs" id="dash-trade-count">∞ | 0 / 5</span></div>
+          <div class="limit-bar"><div class="limit-fill" id="dash-limit-fill" style="width:0%"></div></div>
+        </div>
+        <div class="health-text" id="dash-health-text">Bot Active</div>
+      </div>
+
+      <div class="card">
+        <div class="controls-row">
+          <button class="btn btn-start" id="btn-start">▶ START BOT</button>
+          <button class="btn btn-stop" id="btn-stop">⏹ STOP BOT</button>
+        </div>
+        <div id="auto-stop-info" class="auto-stop-info hidden">
+          Bot runs until 1:3 R:R target is hit or market conditions trigger exit. Tap STOP to intervene.
+        </div>
+        <div class="mode-selector" id="mode-selector">
+          <button class="mode-btn active" data-mode="long">Long-term</button>
+          <button class="mode-btn" data-mode="short">Short-term</button>
+        </div>
+        <div id="mode-params">
+          <div class="param-row" id="trade-count-row">
+            <span class="label-sm">Number of trades</span>
+            <div class="stepper">
+              <button class="stepper-btn" id="tc-dec">−</button>
+              <span id="tc-value">1</span>
+              <button class="stepper-btn" id="tc-inc">+</button>
+            </div>
+          </div>
+          <div class="param-row">
+            <span class="label-sm">Risk %</span>
+            <span><strong id="risk-pct">5</strong>% (<span id="risk-usd">$0.00</span>)</span>
+          </div>
+          <div class="slider-container">
+            <div class="slider-track"><div class="slider-fill" id="risk-fill" style="width:50%"></div></div>
+            <div class="slider-labels" id="risk-labels">
+              <button data-risk="1">1</button><button data-risk="2">2</button><button data-risk="3">3</button>
+              <button data-risk="4">4</button><button data-risk="5">5</button><button data-risk="6">6</button>
+              <button data-risk="7">7</button><button data-risk="8">8</button><button data-risk="9">9</button>
+              <button data-risk="10">10</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">📋 Recent Trades</span></div>
+        <div id="recent-trades">
+          <div class="trade-header"><span>Pair</span><span>Type</span><span>P&L</span><span>Time</span></div>
+          <div class="empty-state">No trades yet</div>
+        </div>
+        <button class="btn-link" id="see-all-trades">See all →</button>
+      </div>
+
+      <div class="card">
+        <div class="performance-row">
+          <span class="card-title">Today's P&L</span>
+          <span class="today-pnl" id="dash-daily-pnl">+$0.00</span>
+        </div>
+        <div class="actions-grid">
+          <button class="action-btn" data-page="copilot">💬 Chat</button>
+          <button class="action-btn" data-page="accountability">📖 History</button>
+          <button class="action-btn" data-page="settings">⚙️ Settings</button>
+          <button class="action-btn" id="support-quick">🆘 Support</button>
+        </div>
+        <div id="cooldown-banner" class="warning-banner hidden">
+          ⚠️ Bot paused due to 3 consecutive losses (cooldown 24h).
+        </div>
+      </div>
+    </div>
+
+    <div id="page-accountability" class="page page-content hidden">
+      <div class="stats-row" id="acct-stats">
+        <div class="stat-card"><div class="stat-value" id="acct-total">0</div><div class="stat-label">Total Trades</div></div>
+        <div class="stat-card"><div class="stat-value profit" id="acct-winrate">0%</div><div class="stat-label">Win Rate</div></div>
+        <div class="stat-card"><div class="stat-value" id="acct-pnl">$0</div><div class="stat-label">Total P&L</div></div>
+      </div>
+      <div class="filter-row">
+        <div class="range-row" id="range-row">
+          <button class="range-btn active" data-range="7">7 Days</button>
+          <button class="range-btn" data-range="30">30 Days</button>
+          <button class="range-btn" data-range="90">90 Days</button>
+          <button class="range-btn" data-range="all">All</button>
+        </div>
+        <div class="export-row">
+          <button class="export-btn" data-format="csv">CSV</button>
+          <button class="export-btn" data-format="pdf">PDF</button>
+        </div>
+      </div>
+      <div class="card table-card">
+        <div id="trades-table">
+          <div class="table-header"><span>Pair</span><span>Type</span><span>Lots</span><span>Entry</span><span>Exit</span><span>P&L</span><span>Time</span></div>
+          <div class="empty-state" id="trades-empty">No trades found</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="page-copilot" class="page page-content hidden">
+      <div class="chat-area" id="chat-area">
+        <div class="chat-msg bot">👋 Hi, I'm FUTURES. Ask me anything trading related and your account management.</div>
+      </div>
+      <div class="suggestions" id="suggestions">
+        <button class="chip" data-action="What is my account balance?">Balance</button>
+        <button class="chip" data-action="Show my open trades">Trades</button>
+        <button class="chip" data-action="Explain the last trade">Last trade</button>
+        <button class="chip" data-action="Any news affecting the market?">News</button>
+        <button class="chip" data-action="Generate a chart for GBPUSD">Chart</button>
+        <button class="chip" data-action="Stop the bot now">Stop</button>
+        <button class="chip" data-action="clear">Clear</button>
+      </div>
+      <div class="confirm-row hidden" id="confirm-row">
+        <span class="label-xs">This action requires confirmation:</span>
+        <button class="btn btn-sm btn-success" id="confirm-btn">Confirm</button>
+      </div>
+      <div class="input-row">
+        <input type="text" id="chat-input" class="input chat-input" placeholder="Ask FUTURES...">
+        <button class="btn btn-primary btn-circle" id="chat-send">→</button>
+      </div>
+    </div>
+
+    <div id="page-settings" class="page page-content hidden">
+      <div class="card">
+        <div class="card-title">👤 Account</div>
+        <div class="setting-row"><span>Display name</span><span id="set-name">Trader</span><button class="btn-link edit-name">Edit</button></div>
+        <div class="setting-row"><span>Password</span><button class="btn-link" id="show-pw-modal">Update</button></div>
+        <div class="setting-row"><span>Two-factor authentication</span><label class="toggle"><input type="checkbox" disabled><span class="slider"></span></label></div>
+      </div>
+      <div class="card">
+        <div class="card-title">📊 Trading Preferences</div>
+        <div class="setting-row"><span>Risk per trade</span><span><strong id="set-risk-pct">5</strong>%</span></div>
+        <div class="slider-container">
+          <div class="slider-track"><div class="slider-fill" id="set-risk-fill" style="width:50%"></div></div>
+          <div class="slider-labels" id="set-risk-labels">
+            <button data-risk="1">1</button><button data-risk="2">2</button><button data-risk="3">3</button>
+            <button data-risk="4">4</button><button data-risk="5">5</button><button data-risk="6">6</button>
+            <button data-risk="7">7</button><button data-risk="8">8</button><button data-risk="9">9</button>
+            <button data-risk="10">10</button>
+          </div>
+        </div>
+        <div class="setting-row"><span>Max daily trades</span>
+          <div class="stepper">
+            <button class="stepper-btn" id="mdt-dec">−</button>
+            <span id="mdt-value">5</span>
+            <button class="stepper-btn" id="mdt-inc">+</button>
+          </div>
+        </div>
+        <div class="section-label">Breakeven policy</div>
+        <div class="radio-group" id="be-group">
+          <label class="radio-option"><input type="radio" name="be" value="auto" checked><span>Auto BE (Move SL to entry after profit)</span></label>
+          <label class="radio-option"><input type="radio" name="be" value="notify"><span>Notify & Exit (Alert user, auto-close)</span></label>
+          <label class="radio-option"><input type="radio" name="be" value="none"><span>No BE (Trailing stop only)</span></label>
+        </div>
+        <div id="compound-warning" class="warning-banner hidden">⚠️ Auto-compounding reinvests profits – risk increases after wins. Use with caution.</div>
+        <div class="setting-row"><span>Auto-compounding</span><label class="toggle"><input type="checkbox" id="set-compound"><span class="slider"></span></label></div>
+        <div class="setting-row"><span>Dry-run mode</span><label class="toggle"><input type="checkbox" id="set-dryrun"><span class="slider"></span></label></div>
+      </div>
+      <div class="card">
+        <div class="card-title">📡 MT5 Connection</div>
+        <div class="setting-row"><span>Account</span><span id="mt5-login">Not configured</span></div>
+        <div class="section-label">Broker</div>
+        <div class="radio-group" id="broker-group">
+          <label class="radio-option"><input type="radio" name="broker" value="HFM" checked><span>HFM</span></label>
+          <label class="radio-option"><input type="radio" name="broker" value="Exness"><span>Exness</span></label>
+        </div>
+        <div class="section-label">Account Type</div>
+        <div class="radio-group" id="acct-type-group">
+          <label class="radio-option"><input type="radio" name="accttype" value="Demo" checked><span>Demo</span></label>
+          <label class="radio-option"><input type="radio" name="accttype" value="Live"><span>Live</span></label>
+          <label class="radio-option"><input type="radio" name="accttype" value="Real"><span>Real</span></label>
+        </div>
+        <div class="setting-row"><span>Server</span><span id="mt5-server">-</span><span id="mt5-status" class="label-xs">Not configured</span></div>
+        <button class="btn btn-outline" id="test-mt5">Test Connection</button>
+      </div>
+      <div class="card">
+        <div class="card-title">🔔 Notifications</div>
+        <div id="notif-list"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">🎨 Appearance</div>
+        <div class="setting-row"><span>Dark mode</span><label class="toggle"><input type="checkbox" id="theme-switch"><span class="slider"></span></label></div>
+      </div>
+      <div class="card">
+        <div class="card-title">📁 Data Management</div>
+        <button class="btn btn-outline" id="export-csv">Export Trade History</button>
+        <button class="btn btn-outline" id="clear-cache" style="margin-top:8px;border-color:var(--loss)">Clear Cached Chat History</button>
+      </div>
+      <div class="settings-footer">Settings are saved automatically</div>
+    </div>
+  </main>
+
+  <nav class="bottom-nav" id="bottom-nav">
+    <button class="nav-item active" data-page="dashboard"><span class="nav-icon">📊</span><span class="nav-label">Dashboard</span></button>
+    <button class="nav-item" data-page="accountability"><span class="nav-icon">📋</span><span class="nav-label">Accountability</span></button>
+    <button class="nav-item" data-page="copilot"><span class="nav-icon">🤖</span><span class="nav-label">Copilot</span></button>
+    <button class="nav-item" data-page="settings"><span class="nav-icon">⚙️</span><span class="nav-label">Settings</span></button>
+  </nav>
+</div>
+
+<div id="modal-overlay" class="modal-overlay hidden">
+  <div class="modal" id="modal-content"></div>
+</div>
+
+<audio id="cashout-sound" src="assets/audio/cashout.mp3" preload="auto"></audio>
+<script src="main.js"></script>
+</body>
+</html>

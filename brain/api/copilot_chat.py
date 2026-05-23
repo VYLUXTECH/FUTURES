@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import time
+import urllib.parse
 import uuid
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -14,13 +15,12 @@ from typing import Any
 
 import aiohttp
 
-from config.settings import OPENROUTER_API_KEY, OPENROUTER_MODEL, SUPABASE_DB_URI
-from config.constants import SUPPORTED_PAIRS, SESSION_START_UTC, SESSION_END_UTC, TARGET_RR
-from db import get_recent_trades, get_open_trades, get_todays_pnl, count_trades_today, get_state
+from brain.config.settings import AI_BASE_URL, AI_MODEL, SUPABASE_DB_URI
+from brain.config.constants import SUPPORTED_PAIRS, SESSION_START_UTC, SESSION_END_UTC, TARGET_RR
+from brain.db import get_recent_trades, get_open_trades, get_todays_pnl, count_trades_today, get_state
 
 logger = logging.getLogger(__name__)
 
-_OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 RATE_LIMIT_PER_MIN = 30
 
 _pending_confirmations: dict[str, dict] = {}
@@ -28,25 +28,13 @@ _rate_store: dict[str, list[float]] = defaultdict(list)
 _rate_lock = asyncio.Lock()
 
 _SYSTEM_PROMPT_BASE = (
-    "You are FUTURES Trading Bot, an AI trading assistant. "
-    "You are calm, risk-aware, brief (1-2 sentences per response, "
-    "max 3-4 for trade explanations). "
-    "You NEVER promise guaranteed returns or encourage excessive risk. "
-    "You NEVER give financial advice — only analysis and execution. "
-    "Introduce yourself as 'FUTURES Trading Bot', never as a third-party model. "
-    "If asked non-trading questions, politely refuse: "
-    "'I only discuss trading and the FUTURES bot.' "
+    "You are FUTURES, an AI trading assistant. "
+    "You are calm, risk-aware, brief (1-2 sentences per response). "
+    "You NEVER promise returns or encourage excessive risk. "
+    "You NEVER give financial advice — only analysis. "
+    "Introduce yourself as 'FUTURES'. "
+    "If asked non-trading questions, politely refuse. "
     "Use the user's display name if known."
-)
-
-_AGENTS_RULES = (
-    "Core rules:\n"
-    "- NEVER execute trades without user confirmation.\n"
-    "- Respect daily loss limits, risk %, and trade caps.\n"
-    "- Check market hours (07:00-17:00 UTC / 10:00-20:00 EAT).\n"
-    "- Check news status before suggesting trades.\n"
-    "- Max position: 10% of balance. Max daily loss: 5%. Max drawdown: 15%.\n"
-    "- If user says 'KILL' or 'STOP ALL': close all positions and stop bot."
 )
 
 _TOOLS = [
@@ -441,7 +429,7 @@ async def _generate_chart(symbol: str, bot_state: dict, timeframe: str = "15m") 
     image_url = None
     if SUPABASE_DB_URI:
         try:
-            from db.supabase import _get_conn
+            from brain.db.supabase import _get_conn
             conn = _get_conn(SUPABASE_DB_URI)
             from supabase import create_client
             supabase_url = os.getenv("SUPABASE_URL", "")
@@ -488,6 +476,37 @@ def _build_system_prompt(user_email: str | None, display_name: str | None) -> st
     return f"{_SYSTEM_PROMPT_BASE}\n\n{_AGENTS_RULES}\n\n{name_part}"
 
 
+async def _call_ai(messages: list[dict]) -> str:
+    query_parts = []
+    for msg in messages:
+        role = msg.get("role", "user")
+        content = msg.get("content", "")
+        if role == "system":
+            query_parts.append(f"System: {content}")
+        elif role == "user":
+            query_parts.append(f"User: {content}")
+        elif role == "assistant":
+            query_parts.append(f"Assistant: {content}")
+    query = "\n\n".join(query_parts) + "\n\nAssistant:"
+    params = urllib.parse.urlencode({"query": query, "model": AI_MODEL})
+    url = f"{AI_BASE_URL}/?{params}"
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=60)) as resp:
+                if resp.status != 200:
+                    text = await resp.text()
+                    logger.error("AI error %d: %s", resp.status, text[:300])
+                    return "I'm having trouble connecting right now."
+                data = await resp.json()
+                return data.get("message", {}).get("content", "") or "Done."
+    except asyncio.TimeoutError:
+        return "I'm thinking too long. Try again."
+    except aiohttp.ClientError as exc:
+        logger.error("AI network error: %s", exc)
+        return "Network issue. Please check your connection."
+
+
 async def chat_completion(
     messages: list[dict],
     user_id: str,
@@ -495,129 +514,17 @@ async def chat_completion(
     user_email: str | None = None,
     display_name: str | None = None,
 ) -> dict:
-    if not OPENROUTER_API_KEY:
-        return {"reply": "Copilot is not configured. Please set OPENROUTER_API_KEY."}
+    if not AI_BASE_URL:
+        return {"reply": "Copilot is not configured."}
 
     if await is_rate_limited(user_id):
-        return {"reply": "You are sending messages too quickly. Please wait.", "rate_limited": True}
+        return {"reply": "Too fast. Please wait.", "rate_limited": True}
 
     system_prompt = _build_system_prompt(user_email, display_name)
+    full_messages = [{"role": "system", "content": system_prompt}] + messages
 
-    payload = {
-        "model": OPENROUTER_MODEL,
-        "messages": [{"role": "system", "content": system_prompt}] + messages,
-        "tools": _TOOLS,
-        "tool_choice": "auto",
-        "max_tokens": 1024,
-        "temperature": 0.3,
-    }
-
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://futuresbrain.app",
-        "X-Title": "FuturesBrain Copilot",
-    }
-
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(_OPENROUTER_URL, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as resp:
-                if resp.status != 200:
-                    text = await resp.text()
-                    logger.error("OpenRouter chat error %d: %s", resp.status, text[:300])
-                    return {"reply": "Copilot is temporarily unavailable. Please try again."}
-                data = await resp.json()
-    except asyncio.TimeoutError:
-        return {"reply": "Copilot is taking too long. Please try again."}
-    except aiohttp.ClientError as exc:
-        logger.error("Copilot network error: %s", exc)
-        return {"reply": "Network error. Please check your connection."}
-
-    try:
-        choice = data["choices"][0]
-        msg = choice["message"]
-    except (KeyError, IndexError):
-        logger.warning("Unexpected OpenRouter response: %s", str(data)[:300])
-        return {"reply": "Unexpected response from Copilot."}
-
-    # If the model just wants to reply with text
-    if msg.get("content") and not msg.get("tool_calls"):
-        content = msg["content"]
-        # Check if model indicates it wants to call an action tool via text
-        tool_name = None
-        tool_args = {}
-        for line in content.split("\n"):
-            line = line.strip().lower()
-            for tdef in _TOOLS:
-                fn = tdef["function"]
-                if fn["name"] in line:
-                    tool_name = fn["name"]
-                    break
-            if tool_name:
-                break
-        if tool_name and tool_name in _ACTION_TOOLS:
-            cid = str(uuid.uuid4())
-            _pending_confirmations[cid] = {"tool": tool_name, "args": tool_args, "user_id": user_id}
-            return {
-                "reply": content,
-                "requires_confirmation": True,
-                "confirmation_id": cid,
-                "tool_name": tool_name,
-            }
-        return {"reply": content}
-
-    # Handle tool calls
-    tool_calls = msg.get("tool_calls", [])
-    if not tool_calls:
-        return {"reply": msg.get("content", "I'm not sure how to respond to that.")}
-
-    results = []
-    needs_confirm = None
-    for tc in tool_calls:
-        fn = tc.get("function", {})
-        name = fn.get("name", "")
-        try:
-            args = json.loads(fn.get("arguments", "{}"))
-        except json.JSONDecodeError:
-            args = {}
-
-        if name in _ACTION_TOOLS:
-            cid = str(uuid.uuid4())
-            _pending_confirmations[cid] = {"tool": name, "args": args, "user_id": user_id}
-            needs_confirm = {"confirmation_id": cid, "tool_name": name}
-            continue
-
-        result = await _execute_tool(name, args, bot_state)
-        results.append({"tool": name, "result": result})
-
-    # If there were action tools, return confirmation request
-    if needs_confirm:
-        return {
-            "reply": None if not results else json.dumps(results),
-            "requires_confirmation": True,
-            **needs_confirm,
-        }
-
-    # Send tool results back to the model for a final response
-    payload["messages"].append(msg)
-    for r in results:
-        payload["messages"].append({
-            "role": "tool",
-            "tool_call_id": tc.get("id", ""),
-            "content": json.dumps(r["result"]),
-        })
-
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(_OPENROUTER_URL, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as resp:
-                if resp.status != 200:
-                    return {"reply": "Copilot encountered an error processing the data."}
-                data2 = await resp.json()
-        final_text = data2["choices"][0]["message"]["content"] or "Done."
-        return {"reply": final_text}
-    except Exception as exc:
-        logger.warning("Copilot follow-up error: %s", exc)
-        return {"reply": "Done.", "tool_results": results}
+    reply = await _call_ai(full_messages)
+    return {"reply": reply}
 
 
 async def execute_confirmation(confirmation_id: str, user_id: str, bot_state: dict) -> dict:

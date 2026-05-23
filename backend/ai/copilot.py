@@ -3,11 +3,10 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import time
+import urllib.parse
 from collections import defaultdict
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, Callable
 
 import aiohttp
@@ -18,25 +17,18 @@ except ImportError:
     mt5 = None
     MT5_AVAILABLE = False
 
-from brain.config.constants import SUPPORTED_PAIRS, MIN_RISK_PERCENT, MAX_RISK_PERCENT
-from brain.config.settings import OPENROUTER_API_KEY
-from brain.db.sqlite import (
+from brain.config.settings import AI_BASE_URL, AI_MODEL
+from brain.db.postgres import (
     get_open_trades,
     get_recent_trades,
     get_todays_pnl,
     count_trades_today,
-    get_state,
-    set_state,
 )
 
-from backend.ai.tools import TOOL_DEFINITIONS, INFO_TOOL_NAMES, ACTION_TOOL_NAMES
 from backend.ai.market_summary import MarketSummaryEngine
 from backend.ai.chart_generator import ChartGenerator
 
 logger = logging.getLogger(__name__)
-
-MODEL = "anthropic/claude-3.5-sonnet"
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 RATE_LIMIT_PER_MIN = 30
 CONFIRMATION_TIMEOUT = 120
@@ -45,7 +37,7 @@ CONFIRMATION_TIMEOUT = 120
 class CopilotEngine:
     """
     AI Copilot — control interface for the autonomous trading brain.
-    - Claude 3.5 Sonnet via OpenRouter
+    - DeepSeek via custom AI endpoint
     - Starts/stops the brain's trading loop
     - Answers market questions using pre-computed summaries
     - Does NOT execute individual trades (the brain's pipeline handles all entries/SL/TP)
@@ -91,23 +83,14 @@ class CopilotEngine:
                 f"{rejection}\n"
             )
 
-        return f"""You are FUTURES. You are the analytical brain of a price action trading bot.
-Your name is FUTURES. Never identify as Claude or any other AI — you are FUTURES.
-If asked who created you, say VYLUX TECH.
+        return f"""You are FUTURES, an AI trading assistant. You are calm, risk-aware, and brief (1-2 sentences). You NEVER promise returns or encourage excessive risk. You NEVER give financial advice — only analysis. Introduce yourself as 'FUTURES'. If asked non-trading questions, politely refuse. Use the user's name if known.
 
 DATE: {now} UTC
 
-== CURRENT MARKET CONDITIONS ==
-{market_text or "Market data not yet available – bot may be starting up."}
+CURRENT MARKET CONDITIONS:
+{market_text or "Market data not yet available."}
 
-== CONTROL ==
-The brain's pipeline runs autonomously. When the user says "start trading" or "stop trading", call start_trading or stop_trading — the brain handles all analysis, entry, SL/TP, and position management. You do not calculate SL/TP or place individual trades.
-
-When asked about a pair, respond in 1 sentence: price relative to key level, bias, and what comes next.
-
-When asked to start/stop, call the tool and confirm in 1 sentence — no explanation of the trade itself.
-
-Available tools are for querying state and controlling the brain."""
+RESPOND naturally and conversationally. Do NOT output JSON or code."""
 
     # ── Rate Limiting ──────────────────────────────────────
 
@@ -385,107 +368,56 @@ Available tools are for querying state and controlling the brain."""
                 conv = conv[-50:]
                 self._conversations[user_id] = conv
 
-        if not OPENROUTER_API_KEY:
-            return {"reply": "Copilot not configured. Set OPENROUTER_API_KEY."}
+        if not AI_BASE_URL:
+            return {"reply": "Copilot not configured."}
 
         messages = [{"role": "system", "content": system_prompt}]
         async with self._conv_lock:
             for msg in self._conversations[user_id][-20:]:
                 messages.append(msg)
 
-        result = await self._call_llm(messages)
-
-        action_confirmations = []
-        if "tool_calls" in result:
-            for tc in result["tool_calls"]:
-                tool_name = tc["function"]["name"]
-                try:
-                    tool_args = json.loads(tc["function"]["arguments"])
-                except json.JSONDecodeError:
-                    tool_args = {}
-
-                if tool_name in ACTION_TOOL_NAMES:
-                    conf_id = await self.request_confirmation(user_id, {
-                        "tool": tool_name,
-                        "args": tool_args,
-                    })
-                    action_confirmations.append({
-                        "tool": tool_name,
-                        "confirmation_id": conf_id,
-                    })
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tc["id"],
-                        "content": json.dumps({
-                            "status": "confirmation_required",
-                            "confirmation_id": conf_id,
-                            "message": f"Ask the user to confirm {tool_name}.",
-                        }),
-                    })
-                elif tool_name in INFO_TOOL_NAMES:
-                    tool_result = await self._handle_tool(tool_name, tool_args)
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tc["id"],
-                        "content": json.dumps(tool_result),
-                    })
-
-            result = await self._call_llm(messages)
-
-        reply = result.get("content", "") or "Done."
-        response: dict[str, Any] = {"reply": reply}
-        if action_confirmations:
-            response["requires_confirmation"] = True
-            response["confirmation_id"] = action_confirmations[0]["confirmation_id"]
+        reply = await self._call_llm(messages)
 
         async with self._conv_lock:
             self._conversations[user_id].append({"role": "assistant", "content": reply})
 
-        return response
+        return {"reply": reply}
 
     async def _call_llm(
         self,
         messages: list[dict],
-    ) -> dict:
-        payload = {
-            "model": MODEL,
-            "messages": messages,
-            "tools": TOOL_DEFINITIONS,
-            "tool_choice": "auto",
-            "max_tokens": 1024,
-            "temperature": 0.3,
-        }
-        headers = {
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://futures.app",
-            "X-Title": "FUTURES Copilot",
-        }
+    ) -> str:
+        query_parts = []
+        for msg in messages:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            if role == "system":
+                query_parts.append(f"System: {content}")
+            elif role == "user":
+                query_parts.append(f"User: {content}")
+            elif role == "assistant":
+                query_parts.append(f"Assistant: {content}")
+        query = "\n\n".join(query_parts) + "\n\nAssistant:"
+        params = urllib.parse.urlencode({"query": query, "model": AI_MODEL})
+        url = f"{AI_BASE_URL}/?{params}"
+
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    OPENROUTER_URL,
-                    json=payload,
-                    headers=headers,
-                    timeout=aiohttp.ClientTimeout(total=30),
+                async with session.get(
+                    url,
+                    timeout=aiohttp.ClientTimeout(total=60),
                 ) as resp:
                     if resp.status != 200:
                         text = await resp.text()
                         logger.error("LLM error %d: %s", resp.status, text[:300])
-                        return {"error": f"upstream_error_{resp.status}"}
+                        return "I'm having trouble connecting right now."
                     data = await resp.json()
-                    choice = data["choices"][0]
-                    msg = choice.get("message", {})
-                    return {
-                        "content": msg.get("content", ""),
-                        "tool_calls": msg.get("tool_calls"),
-                        "finish_reason": choice.get("finish_reason", "stop"),
-                    }
+                    return data.get("message", {}).get("content", "") or "Done."
         except asyncio.TimeoutError:
-            return {"error": "upstream_timeout"}
+            return "I'm thinking too long. Try again."
         except aiohttp.ClientError as exc:
             logger.error("LLM network error: %s", exc)
-            return {"error": "network_error"}
+            return "Network issue. Please check your connection."
 
     def clear_conversation(self, user_id: str) -> None:
         self._conversations[user_id] = []

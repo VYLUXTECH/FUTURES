@@ -10,12 +10,18 @@ import logging
 from typing import Any
 
 import MetaTrader5 as mt5
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from api.copilot import analyze_chart
-from db import get_open_trades, get_recent_trades, get_todays_pnl, count_trades_today
-from config.constants import SUPPORTED_PAIRS
+from brain.api.copilot import analyze_chart
+from brain.db import get_open_trades, get_recent_trades, get_todays_pnl, count_trades_today
+from brain.config.constants import SUPPORTED_PAIRS
+
+try:
+    from backend.api.middleware import require_auth
+except ImportError:
+    async def require_auth() -> dict:
+        return {}
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -90,7 +96,7 @@ async def health() -> dict:
 
 
 @router.get("/api/status", response_model=BotStatusResponse)
-async def bot_status() -> BotStatusResponse:
+async def bot_status(user: dict = Depends(require_auth)) -> BotStatusResponse:
     """Full bot status for dashboard header."""
     from datetime import datetime, timezone
     from config.constants import SESSION_START_UTC, SESSION_END_UTC
@@ -131,7 +137,7 @@ async def bot_status() -> BotStatusResponse:
 # ── Dashboard ─────────────────────────────────────────────
 
 @router.get("/api/dashboard")
-async def dashboard() -> dict:
+async def dashboard(user: dict = Depends(require_auth)) -> dict:
     """Aggregate data for the dashboard page."""
     open_trades = get_open_trades()
     recent_trades = get_recent_trades(limit=10)
@@ -156,7 +162,7 @@ async def dashboard() -> dict:
 # ── Trade History ─────────────────────────────────────────
 
 @router.get("/api/trades")
-async def get_trades(limit: int = 50) -> dict:
+async def get_trades(limit: int = 50, user: dict = Depends(require_auth)) -> dict:
     """Trade history for accountability page."""
     trades = get_recent_trades(limit=min(limit, 200))
     return {"trades": trades, "count": len(trades)}
@@ -171,7 +177,7 @@ class StartBotRequest(BaseModel):
 
 
 @router.post("/api/user/start")
-async def start_bot(req: StartBotRequest | None = None, request: Request = None) -> dict:
+async def start_bot(req: StartBotRequest | None = None, request: Request = None, user: dict = Depends(require_auth)) -> dict:
     """Signal the trading loop to (re)start. Accepts risk config.
     Modes: 'short' (single trade, default), 'long' (continuous trading with auto-compounding).
     If the trading thread isn't running yet, starts it with
@@ -186,7 +192,7 @@ async def start_bot(req: StartBotRequest | None = None, request: Request = None)
         uri = SUPABASE_DB_URI or os.getenv("SUPABASE_DB_URI")
         if uri:
             try:
-                from db.supabase import _get_conn
+                from brain.db.supabase import _get_conn
                 conn = _get_conn(uri)
                 with conn, conn.cursor() as cur:
                     cur.execute(
@@ -239,7 +245,7 @@ async def start_bot(req: StartBotRequest | None = None, request: Request = None)
 
 
 @router.post("/api/user/stop")
-async def stop_bot() -> dict:
+async def stop_bot(user: dict = Depends(require_auth)) -> dict:
     """Gracefully halt the trading loop."""
     _bot_state["running"] = False
     logger.info("Bot stop requested via API")
@@ -249,7 +255,7 @@ async def stop_bot() -> dict:
 # ── Copilot ───────────────────────────────────────────────
 
 @router.post("/api/copilot/analyze")
-async def copilot_analyze(req: CopilotRequest, request: Request) -> dict:
+async def copilot_analyze(req: CopilotRequest, request: Request, user: dict = Depends(require_auth)) -> dict:
     """
     AI chart analysis via OpenRouter Claude Vision.
     Rate-limited to 15/hr per IP. Never executes trades.
@@ -277,7 +283,7 @@ class CopilotChatRequest(BaseModel):
 
 
 @router.post("/api/copilot/chat")
-async def copilot_chat(req: CopilotChatRequest, request: Request) -> dict:
+async def copilot_chat(req: CopilotChatRequest, request: Request, user: dict = Depends(require_auth)) -> dict:
     """Chat with the AI Copilot. Supports function calling for account info, trades, chart gen, and actions."""
     from api.copilot_chat import chat_completion, _decode_jwt_payload
 
@@ -297,7 +303,7 @@ class ConfirmRequest(BaseModel):
 
 
 @router.post("/api/copilot/confirm")
-async def copilot_confirm(req: ConfirmRequest, request: Request) -> dict:
+async def copilot_confirm(req: ConfirmRequest, request: Request, user: dict = Depends(require_auth)) -> dict:
     """Confirm and execute a pending action from the copilot."""
     from api.copilot_chat import execute_confirmation, _decode_jwt_payload
 
@@ -309,7 +315,7 @@ async def copilot_confirm(req: ConfirmRequest, request: Request) -> dict:
 
 
 @router.post("/api/copilot/clear")
-async def copilot_clear() -> dict:
+async def copilot_clear(user: dict = Depends(require_auth)) -> dict:
     """Clear copilot chat state (no-op, state is on frontend)."""
     return {"status": "ok"}
 
@@ -324,7 +330,7 @@ class MT5ConnectRequest(BaseModel):
 
 
 @router.post("/api/mt5/connect")
-async def mt5_connect(req: MT5ConnectRequest) -> dict:
+async def mt5_connect(req: MT5ConnectRequest, user: dict = Depends(require_auth)) -> dict:
     """
     Test MT5 connection and update status in Supabase.
     Credentials are saved by the frontend directly — this endpoint
@@ -350,7 +356,7 @@ async def mt5_connect(req: MT5ConnectRequest) -> dict:
     server_to_use = req.server
     if not password_to_use and uri:
         try:
-            from db.supabase import _get_conn
+            from brain.db.supabase import _get_conn
             from utils.crypto import decrypt_password
             conn = _get_conn(uri)
             with conn, conn.cursor() as cur:
@@ -434,7 +440,7 @@ async def mt5_connect(req: MT5ConnectRequest) -> dict:
     # ── Persist connection result back to Supabase (match by login + server) ──
     if uri:
         try:
-            from db.supabase import _get_conn
+            from brain.db.supabase import _get_conn
             conn = _get_conn(uri)
             with conn, conn.cursor() as cur:
                 cur.execute("""
@@ -473,7 +479,7 @@ async def mt5_connect(req: MT5ConnectRequest) -> dict:
 # ── MT5 Connection Info ───────────────────────────────────
 
 @router.get("/api/mt5/info")
-async def mt5_info() -> dict:
+async def mt5_info(user: dict = Depends(require_auth)) -> dict:
     """Return MT5 terminal and account information."""
     loop = asyncio.get_event_loop()
     terminal = await loop.run_in_executor(None, mt5.terminal_info)
@@ -501,7 +507,7 @@ async def mt5_info() -> dict:
 
 
 @router.get("/api/mt5/credentials")
-async def get_mt5_credentials() -> dict:
+async def get_mt5_credentials(user: dict = Depends(require_auth)) -> dict:
     """Return saved MT5 credentials (login, server, connected status). Password excluded."""
     import os
     from config.settings import SUPABASE_DB_URI
@@ -511,7 +517,7 @@ async def get_mt5_credentials() -> dict:
         return {"login": None, "server": None, "connected": False}
 
     try:
-        from db.supabase import _get_conn
+        from brain.db.supabase import _get_conn
         conn = _get_conn(uri)
         with conn, conn.cursor() as cur:
             cur.execute(
@@ -533,7 +539,7 @@ async def get_mt5_credentials() -> dict:
 
 
 @router.get("/api/mt5/accounts")
-async def list_mt5_accounts() -> dict:
+async def list_mt5_accounts(user: dict = Depends(require_auth)) -> dict:
     """List all saved MT5 accounts."""
     import os
     from config.settings import SUPABASE_DB_URI
@@ -543,7 +549,7 @@ async def list_mt5_accounts() -> dict:
         return {"accounts": []}
 
     try:
-        from db.supabase import _get_conn
+        from brain.db.supabase import _get_conn
         conn = _get_conn(uri)
         with conn, conn.cursor() as cur:
             cur.execute(
@@ -573,7 +579,7 @@ class SwitchAccountRequest(BaseModel):
 
 
 @router.post("/api/mt5/switch")
-async def switch_mt5_account(req: SwitchAccountRequest) -> dict:
+async def switch_mt5_account(req: SwitchAccountRequest, user: dict = Depends(require_auth)) -> dict:
     """Switch the active MT5 account. Requires bot to be stopped."""
     if _bot_state.get("running"):
         raise HTTPException(status_code=400, detail="Stop the bot before switching accounts")
@@ -586,7 +592,7 @@ async def switch_mt5_account(req: SwitchAccountRequest) -> dict:
         return {"status": "error", "detail": "Database not configured"}
 
     try:
-        from db.supabase import _get_conn
+        from brain.db.supabase import _get_conn
         conn = _get_conn(uri)
         with conn, conn.cursor() as cur:
             cur.execute(
@@ -612,7 +618,7 @@ class UpdateMT5CredentialsRequest(BaseModel):
 
 
 @router.put("/api/mt5/credentials")
-async def update_mt5_credentials(req: UpdateMT5CredentialsRequest) -> dict:
+async def update_mt5_credentials(req: UpdateMT5CredentialsRequest, user: dict = Depends(require_auth)) -> dict:
     """Update MT5 server field (e.g., after broker / account-type change)."""
     import os
     from config.settings import SUPABASE_DB_URI
@@ -622,7 +628,7 @@ async def update_mt5_credentials(req: UpdateMT5CredentialsRequest) -> dict:
         return {"status": "noop"}
 
     try:
-        from db.supabase import _get_conn
+        from brain.db.supabase import _get_conn
         conn = _get_conn(uri)
         with conn, conn.cursor() as cur:
             cur.execute(
@@ -641,7 +647,7 @@ async def update_mt5_credentials(req: UpdateMT5CredentialsRequest) -> dict:
 
 
 @router.get("/api/settings")
-async def get_settings() -> dict:
+async def get_settings(user: dict = Depends(require_auth)) -> dict:
     """Return user settings stored in bot_state KV store."""
     from db import get_state, get_user_max_daily_trades
 
@@ -673,7 +679,7 @@ class SettingsRequest(BaseModel):
 
 
 @router.post("/api/settings")
-async def update_settings(req: SettingsRequest) -> dict:
+async def update_settings(req: SettingsRequest, user: dict = Depends(require_auth)) -> dict:
     """Save user settings to bot_state KV store (merged with existing)."""
     from db import get_state, set_state, upsert_user_setting
 
@@ -720,7 +726,7 @@ def _decode_jwt(request: Request) -> dict:
 
 
 @router.post("/api/support/ticket")
-async def create_support_ticket(req: SupportTicketRequest, request: Request) -> dict:
+async def create_support_ticket(req: SupportTicketRequest, request: Request, user: dict = Depends(require_auth)) -> dict:
     """Submit a support ticket. Stores in Supabase + forwards to Telegram admin.
     The user never knows about the Telegram forwarding — it stays in the backend."""
     import os
@@ -737,7 +743,7 @@ async def create_support_ticket(req: SupportTicketRequest, request: Request) -> 
     ticket_id = None
     display_name = f"User: {email}"
     try:
-        from db.supabase import _get_conn
+        from brain.db.supabase import _get_conn
         conn = _get_conn(uri)
         with conn, conn.cursor() as cur:
             cur.execute(
@@ -789,7 +795,7 @@ async def create_support_ticket(req: SupportTicketRequest, request: Request) -> 
 # ── Open Positions ────────────────────────────────────────
 
 @router.get("/api/positions")
-async def open_positions() -> dict:
+async def open_positions(user: dict = Depends(require_auth)) -> dict:
     """Live open positions from MT5."""
     loop = asyncio.get_event_loop()
     positions = await loop.run_in_executor(None, mt5.positions_get)

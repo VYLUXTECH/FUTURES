@@ -4,9 +4,9 @@ from typing import TYPE_CHECKING
 
 import pandas as pd
 
-from config.constants import CONFIDENCE_THRESHOLD, VALID_ALIGNMENTS, PIP_SIZES
-from db import log_signal
-from sectors import (
+from brain.config.constants import CONFIDENCE_THRESHOLD, VALID_ALIGNMENTS, PIP_SIZES
+from brain.db import log_signal
+from brain.sectors import (
     s1_candle,
     s2_structure,
     s3_levels,
@@ -18,7 +18,7 @@ from sectors import (
 )
 
 if TYPE_CHECKING:
-    from core.risk import RiskEngine
+    from brain.core.risk import RiskEngine
 
 logger = logging.getLogger(__name__)
 

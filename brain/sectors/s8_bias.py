@@ -1,6 +1,6 @@
 from __future__ import annotations
 import logging
-from config.constants import PIP_SIZES, MIN_SL_PIPS, ENABLE_SELL_TRADES
+from brain.config.constants import PIP_SIZES, MIN_SL_PIPS, ENABLE_SELL_TRADES
 
 logger = logging.getLogger(__name__)
 

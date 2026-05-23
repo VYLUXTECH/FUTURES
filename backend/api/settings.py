@@ -5,15 +5,16 @@ import io
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from brain.db.sqlite import get_recent_trades
+from brain.db.postgres import get_recent_trades
 from backend.db.supabase import get_client
+from backend.api.middleware import require_auth
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api")
+router = APIRouter(prefix="/api", dependencies=[Depends(require_auth)])
 
 _bot_state_ref: dict[str, Any] | None = None
 

@@ -46,8 +46,7 @@ node_modules/
 package-lock.json
 
 # Expo
-expo-app/dist/
-expo-app/.expo/
+# frontend is a static SPA served by backend — no build artifacts
 
 # Data files
 scripts/data/

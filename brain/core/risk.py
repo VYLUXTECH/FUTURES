@@ -6,7 +6,7 @@ from typing import NamedTuple
 
 import MetaTrader5 as mt5
 
-from config.constants import (
+from brain.config.constants import (
     COOLDOWN_HOURS,
     DAILY_DRAWDOWN_LIMIT,
     DEFAULT_RISK_PERCENT,
@@ -18,8 +18,8 @@ from config.constants import (
     PIP_SIZES,
     MAX_SPREAD_PIPS,
 )
-from core.news_volatility import MT5NewsFilter
-from db import (
+from brain.core.news_volatility import MT5NewsFilter
+from brain.db import (
     count_losses_last_24h,
     count_trades_today,
     get_state,

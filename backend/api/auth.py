@@ -46,7 +46,7 @@ async def register(req: SignUpRequest, request: Request) -> dict:
     return result
 
 
-@router.post("/signin")
+@router.post("/login")
 async def login(req: SignInRequest, request: Request) -> dict:
     _check_rate_limit(request.client.host if request.client else "unknown")
     result = await sign_in(req.email, req.password)
@@ -60,6 +60,24 @@ async def logout(user: dict = Depends(get_current_user)) -> dict:
     token = user.get("access_token", "")
     await sign_out(token)
     return {"status": "signed_out"}
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+@router.post("/forgot-password")
+async def forgot_password(req: ForgotPasswordRequest, request: Request) -> dict:
+    _check_rate_limit(request.client.host if request.client else "unknown")
+    try:
+        from backend.db.supabase import get_client
+        client = get_client()
+        if client:
+            client.auth.reset_password_for_email(req.email)
+        return {"status": "sent"}
+    except Exception as exc:
+        logger.warning("Forgot password error: %s", exc)
+        return {"status": "sent"}
 
 
 @router.get("/user")

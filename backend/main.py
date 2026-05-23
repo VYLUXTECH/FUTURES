@@ -20,9 +20,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ── Ensure brain/ flat imports resolve ──────────────────
-_FB_DIR = str(Path(__file__).resolve().parent.parent / "brain")
-if _FB_DIR not in sys.path:
-    sys.path.insert(0, _FB_DIR)
+_PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
 
 # ── FuturesBrain imports ───────────────────────────────
 import MetaTrader5 as mt5
@@ -36,7 +36,7 @@ from brain.core.pipeline import run as pipeline_run
 from brain.core.executor import place_order, update_trailing_stop, modify_sl_to_break_even
 from brain.core.risk import RiskEngine
 from brain.data.feed import get_candles
-from brain.db.sqlite import init_db, get_open_trades
+from brain.db.postgres import init_db, get_open_trades
 from brain.api.routes import router as fb_router, set_bot_state_ref
 from brain.main import get_mt5_creds
 from brain.utils.mt5_helper import reconnect_mt5, is_connected
@@ -44,6 +44,7 @@ from brain.utils.mt5_helper import reconnect_mt5, is_connected
 from backend.api.auth import router as auth_router
 from backend.api.copilot import router as copilot_router, set_copilot_engine
 from backend.api.settings import router as settings_router, set_bot_state_ref as set_settings_state_ref
+from backend.api.public import router as public_router
 from backend.ai import CopilotEngine, MarketSummaryEngine, ChartGenerator
 from backend.db.supabase import get_client
 from backend.telegram_bot import TelegramAdminBot, create_admin_bot
@@ -172,7 +173,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:8081").split(",") if o.strip()]
+ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "http://localhost:8000,https://bot.futuretraders.net").split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
@@ -183,6 +184,7 @@ app.add_middleware(
 )
 
 # ── Routes ───────────────────────────────────────────────
+app.include_router(public_router)
 app.include_router(fb_router)
 app.include_router(auth_router)
 app.include_router(copilot_router)
@@ -191,46 +193,13 @@ app.include_router(settings_router)
 set_bot_state_ref(_bot_state)
 set_settings_state_ref(_bot_state)
 
-# ── Serve futures-site static HTML ──────────────────────
-SITE_DIR = Path(__file__).resolve().parent.parent / "frontend"
-STATIC_DIR = Path(__file__).resolve().parent.parent / "backend" / "static"
+# ── Serve web frontend ──────────────────────────────────
+WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 
-SITE_DIR.mkdir(parents=True, exist_ok=True)
-STATIC_DIR.mkdir(parents=True, exist_ok=True)
-
-app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
-
-if SITE_DIR.exists():
-    from fastapi.responses import FileResponse, HTMLResponse
-    import mimetypes
-    mimetypes.init()
-
-    HTML_FILES = {f.stem: f for f in SITE_DIR.iterdir() if f.suffix == ".html"}
-
-    for stem, filepath in HTML_FILES.items():
-        route_name = f"/{stem}" if stem != "splash" else "/"
-        if stem == "dasboard":
-            route_name = "/dashboard"
-        def _make_handler(fp: Path):
-            async def _handler():
-                return HTMLResponse(content=fp.read_text())
-            return _handler
-
-        app.get(route_name, include_in_schema=False)(_make_handler(filepath))
-
-    @app.get("/{filename:path}", include_in_schema=False)
-    async def serve_static_or_fallback(filename: str):
-        filepath = SITE_DIR / filename
-        if filepath.exists() and filepath.is_file():
-            content_type, _ = mimetypes.guess_type(str(filepath))
-            if filename.endswith(".mp3"):
-                return FileResponse(str(filepath), media_type="audio/mpeg")
-            if filename.endswith(".jpg") or filename.endswith(".jpeg"):
-                return FileResponse(str(filepath), media_type="image/jpeg")
-            if filename.endswith(".png"):
-                return FileResponse(str(filepath), media_type="image/png")
-            return HTMLResponse(content=filepath.read_text())
-        return HTMLResponse(status_code=404, content="<h1>404 Not Found</h1>")
+if WEB_DIR.exists():
+    app.mount("/", StaticFiles(directory=str(WEB_DIR), html=True), name="web")
+else:
+    logger.warning("web/ directory not found at %s", WEB_DIR)
 
 
 # ── MT5 Init ─────────────────────────────────────────────

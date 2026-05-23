@@ -18,7 +18,7 @@ BEGIN
         SELECT tablename, policyname
         FROM pg_policies
         WHERE schemaname = 'public'
-          AND tablename IN ('trades', 'bot_state', 'signals', 'profiles', 'mt5_credentials', 'support_tickets', 'system_logs', 'news_state', 'legal_acceptances', 'referrals', 'referral_signups', 'user_settings')
+          AND tablename IN ('trades', 'bot_state', 'signals', 'profiles', 'mt5_credentials', 'support_tickets', 'system_logs', 'news_state', 'legal_acceptances', 'user_settings')
     LOOP
         EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', pol.policyname, pol.tablename);
     END LOOP;
@@ -29,8 +29,6 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 DROP FUNCTION IF EXISTS handle_new_user();
 
 -- Drop tables (order matters due to FK dependencies)
-DROP TABLE IF EXISTS public.referral_signups CASCADE;
-DROP TABLE IF EXISTS public.referrals CASCADE;
 DROP TABLE IF EXISTS public.legal_acceptances CASCADE;
 DROP TABLE IF EXISTS public.support_tickets CASCADE;
 DROP TABLE IF EXISTS public.system_logs CASCADE;
@@ -58,7 +56,6 @@ CREATE TABLE public.profiles (
     notifications       JSONB DEFAULT '{"trade_execution": true, "trade_closed": true, "daily_summary": true, "loss_cooldown": true, "maintenance": true, "package_expiry": true, "email_trade": false}'::jsonb,
     bot_active          BOOLEAN DEFAULT FALSE,
     expo_push_token     TEXT,
-    referral_code       TEXT,
     broker_verified     BOOLEAN DEFAULT FALSE,
     broker_name         TEXT,
     created_at          TIMESTAMPTZ DEFAULT NOW(),
@@ -176,31 +173,7 @@ CREATE TABLE public.legal_acceptances (
     created_at          TIMESTAMPTZ DEFAULT NOW()
 );
 
--- ── 10. referrals ───────────────────────────────────────────
--- Tracks referral signups. Each valid referral code is stored here.
--- When a user signs up with a code, it's logged here.
-CREATE TABLE public.referrals (
-    id                  BIGSERIAL PRIMARY KEY,
-    code                TEXT UNIQUE NOT NULL,
-    label               TEXT,
-    broker              TEXT DEFAULT 'HFM',
-    referral_link       TEXT,
-    is_active           BOOLEAN DEFAULT TRUE,
-    total_signups       INTEGER DEFAULT 0,
-    created_at          TIMESTAMPTZ DEFAULT NOW()
-);
 
--- ── 11. referral_signups ────────────────────────────────────
--- Logs each user who signed up via a referral code.
-CREATE TABLE public.referral_signups (
-    id                  BIGSERIAL PRIMARY KEY,
-    user_id             UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
-    referral_code       TEXT REFERENCES public.referrals(code),
-    broker              TEXT,
-    mt5_login           VARCHAR(50),
-    ip_address          TEXT,
-    created_at          TIMESTAMPTZ DEFAULT NOW()
-);
 
 -- ============================================================
 -- PART 3: INDEXES
@@ -227,11 +200,6 @@ CREATE INDEX idx_system_logs_created    ON public.system_logs(created_at DESC);
 
 CREATE INDEX idx_legal_acceptances_user ON public.legal_acceptances(user_id);
 
-CREATE INDEX idx_referrals_code         ON public.referrals(code);
-CREATE INDEX idx_referrals_active       ON public.referrals(is_active);
-
-CREATE INDEX idx_referral_signups_user  ON public.referral_signups(user_id);
-CREATE INDEX idx_referral_signups_code  ON public.referral_signups(referral_code);
 
 -- ============================================================
 -- PART 4: ROW LEVEL SECURITY (RLS)
@@ -246,8 +214,6 @@ ALTER TABLE public.support_tickets      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.system_logs          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.news_state           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.legal_acceptances    ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.referrals            ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.referral_signups     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_settings        ENABLE ROW LEVEL SECURITY;
 
 -- ── profiles ────────────────────────────────────────────────
@@ -353,28 +319,6 @@ CREATE POLICY "Service role full access legal_acceptances"
     ON public.legal_acceptances FOR ALL
     USING (true) WITH CHECK (true);
 
--- ── referrals ───────────────────────────────────────────────
--- Anyone can read active referral codes (for signup flow)
-CREATE POLICY "Anyone can view active referrals"
-    ON public.referrals FOR SELECT
-    USING (is_active = TRUE);
-
--- Service role can do everything
-CREATE POLICY "Service role full access referrals"
-    ON public.referrals FOR ALL
-    USING (true) WITH CHECK (true);
-
--- ── referral_signups ────────────────────────────────────────
--- Users can view their own referral signup record
-CREATE POLICY "Users can view own referral signup"
-    ON public.referral_signups FOR SELECT
-    USING (auth.uid() = user_id);
-
--- Service role can do everything
-CREATE POLICY "Service role full access referral_signups"
-    ON public.referral_signups FOR ALL
-    USING (true) WITH CHECK (true);
-
 -- ── user_settings ───────────────────────────────────────────
 -- Users can read & update their own settings
 CREATE POLICY "Users can view own settings"
@@ -430,12 +374,6 @@ VALUES
     ('app_settings', '{"risk_percent": 5.0, "be_policy": "auto", "dry_run": false, "auto_compounding": false, "display_name": "Trader"}'),
     ('risk_percent', '5.0')
 ON CONFLICT (key) DO NOTHING;
-
--- HFM referral tracking (for admin dashboard only)
-INSERT INTO public.referrals (code, label, broker, referral_link, is_active)
-VALUES
-    ('HFM30489955', 'HFM Partner', 'HFM', 'https://www.hfm.com/sv/en/?refid=30489955', TRUE)
-ON CONFLICT (code) DO NOTHING;
 
 -- ============================================================
 -- DEV BYPASS: Manually verify your own account

@@ -3,7 +3,7 @@
 # ============================================================
 from __future__ import annotations
 
-from config.constants import PIP_SIZES
+from brain.config.constants import PIP_SIZES
 
 
 def pips_to_price(pair: str, pips: float) -> float:

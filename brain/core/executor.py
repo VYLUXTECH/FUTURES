@@ -8,7 +8,7 @@ from typing import Literal
 
 import MetaTrader5 as mt5
 
-from config.constants import (
+from brain.config.constants import (
     MAGIC_NUMBER,
     PIP_SIZES,
     TRAILING_ATR_MULT,
@@ -16,7 +16,7 @@ from config.constants import (
     MAX_SPREAD_PIPS,
     MAX_SLIPPAGE_PIPS,
 )
-from db import sync_trade, get_state
+from brain.db import sync_trade, get_state
 
 logger = logging.getLogger(__name__)
 
@@ -26,10 +26,10 @@ _RETRYABLE_RETCODES: frozenset[int] = frozenset({
     mt5.TRADE_RETCODE_REQUOTE,
     mt5.TRADE_RETCODE_PRICE_CHANGED,
     mt5.TRADE_RETCODE_PRICE_OFF,
-    mt5.TRADE_RETCODE_OFF_QUOTES,
     mt5.TRADE_RETCODE_CONNECTION,
     mt5.TRADE_RETCODE_TIMEOUT,
-})
+    getattr(mt5, "TRADE_RETCODE_OFF_QUOTES", None),
+}) - {None}
 
 Direction = Literal["BUY", "SELL"]
 

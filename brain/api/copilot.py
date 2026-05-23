@@ -1,33 +1,27 @@
 # ============================================================
-# FuturesBrain v1.0 – AI Copilot Endpoint (OpenRouter)
-# BUG FIXES:
-#   • base64 image URL was "image/png;base64,..." (missing "data:")
-#   • Cache now uses asyncio.Lock (was non-async)
-#   • Rate limiter keyed per IP, not hardcoded "admin"
-#   • Copilot NEVER executes trades (enforced via system prompt)
-# SPEC COMPLIANCE:
-#   • 5-min response cache per pair+tf
-#   • 15 req/hr rate limit (per IP)
-#   • JSON schema enforced in response
+# FuturesBrain v1.0 – AI Copilot Endpoint (Custom AI + HF Vision)
+# Uses DeepSeek via all-in-1-ais for text analysis and
+# Qwen-VL via HuggingFace Inference API for chart vision.
 # ============================================================
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
+import urllib.parse
 from collections import defaultdict
 from typing import Any
 
 import aiohttp
 
-from config.settings import OPENROUTER_API_KEY, OPENROUTER_MODEL
+from brain.config.settings import AI_BASE_URL, AI_MODEL, HF_TOKEN, HF_VISION_MODEL
 
 logger = logging.getLogger(__name__)
 
-# ── Constants (spec-aligned) ───────────────────────────────
+# ── Constants ──────────────────────────────────────────────
 COPILOT_CACHE_TTL: int = 300        # 5 minutes
 RATE_LIMIT_PER_HOUR: int = 15
-_OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 _SYSTEM_PROMPT = """You are FuturesBrain Copilot, a read-only trading analyst.
 You analyse forex charts and provide structured JSON insights.
@@ -86,101 +80,147 @@ async def set_cached(cache_key: str, data: Any) -> None:
         _cache[cache_key] = (data, time.monotonic())
 
 
+async def _analyze_with_hf_vision(
+    chart_data_uri: str,
+    pair: str,
+    tf: str,
+    context: dict | None = None,
+) -> dict | None:
+    """Analyze chart image using HuggingFace Qwen-VL vision model."""
+    if not HF_TOKEN:
+        logger.warning("HF_TOKEN not configured, skipping vision analysis")
+        return None
+
+    if not chart_data_uri.startswith("data:image/"):
+        chart_data_uri = f"data:image/png;base64,{chart_data_uri}"
+
+    user_text = (
+        f"Analyse this {pair} {tf} forex chart. "
+        f"Describe the candlestick pattern, support/resistance levels, "
+        f"and any rejection wicks or market structure breaks you see."
+        + (f" Context: {context}" if context else "")
+    )
+
+    hf_url = f"https://api-inference.huggingface.co/models/{HF_VISION_MODEL}"
+    headers = {"Authorization": f"Bearer {HF_TOKEN}", "Content-Type": "application/json"}
+
+    payload = {
+        "inputs": {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": user_text},
+                        {"type": "image_url", "image_url": {"url": chart_data_uri}},
+                    ],
+                }
+            ],
+            "max_tokens": 512,
+        }
+    }
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                hf_url, json=payload, headers=headers,
+                timeout=aiohttp.ClientTimeout(total=120),
+            ) as resp:
+                if resp.status != 200:
+                    text = await resp.text()
+                    logger.warning("HF vision error %d: %s", resp.status, text[:200])
+                    return None
+                data = await resp.json()
+                if isinstance(data, list) and len(data) > 0:
+                    content = data[0].get("generated_text", "")
+                elif isinstance(data, dict):
+                    content = data.get("generated_text", "")
+                else:
+                    content = str(data)
+                return {"vision_analysis": content[:1000]}
+    except Exception as exc:
+        logger.warning("HF vision call failed: %s", exc)
+        return None
+
+
+async def _call_ai_text(messages: list[dict]) -> dict:
+    query_parts = []
+    for msg in messages:
+        role = msg.get("role", "user")
+        content = msg.get("content", "")
+        if role == "system":
+            query_parts.append(f"System: {content}")
+        elif role == "user":
+            query_parts.append(f"User: {content}")
+        elif role == "assistant":
+            query_parts.append(f"Assistant: {content}")
+    query = "\n\n".join(query_parts) + "\n\nAssistant:"
+    params = urllib.parse.urlencode({"query": query, "model": AI_MODEL})
+    url = f"{AI_BASE_URL}/?{params}"
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, timeout=aiohttp.ClientTimeout(total=60)) as resp:
+            if resp.status != 200:
+                text = await resp.text()
+                logger.error("AI text error %d: %s", resp.status, text[:300])
+                return {"error": f"upstream_error_{resp.status}"}
+            data = await resp.json()
+            content = data.get("message", {}).get("content", "")
+            return {"content": content}
+
+
 async def analyze_chart(
-    chart_data_uri: str,   # "data:image/png;base64,..."  ← FIX: include data: prefix
+    chart_data_uri: str,
     pair: str,
     tf: str,
     context: dict | None = None,
     client_ip: str = "unknown",
 ) -> dict:
     """
-    Send chart screenshot to OpenRouter Claude Vision for analysis.
-    Returns a structured JSON dict or an error dict.
-
-    The chart_data_uri MUST start with "data:image/png;base64," as
-    returned by data/feed.py capture_chart().
+    Analyze chart screenshot using custom AI endpoint for text analysis
+    and optionally HuggingFace Qwen-VL for vision-based insights.
+    Returns structured JSON dict or error dict.
     """
-    if not OPENROUTER_API_KEY:
-        return {"error": "OPENROUTER_API_KEY not configured"}
+    if not AI_BASE_URL:
+        return {"error": "AI_BASE_URL not configured"}
 
-    # Rate limit check
     if await is_rate_limited(client_ip):
         return {"error": "rate_limit_exceeded", "limit": RATE_LIMIT_PER_HOUR}
 
-    # Cache hit
     cache_key = f"{pair}_{tf}_{chart_data_uri[:50]}"
     cached = await get_cached(cache_key)
     if cached:
         logger.debug("Copilot cache hit for %s/%s", pair, tf)
         return {**cached, "_cached": True}
 
-    # ── FIX: correct base64 URI (already has "data:" from feed.py) ─
-    # Validate the URI starts with the expected prefix
-    if not chart_data_uri.startswith("data:image/"):
-        chart_data_uri = f"data:image/png;base64,{chart_data_uri}"
+    # Try HF vision analysis first (adds chart context)
+    vision_insight = await _analyze_with_hf_vision(chart_data_uri, pair, tf, context)
+    vision_context = ""
+    if vision_insight:
+        vision_context = f"\nChart vision analysis: {vision_insight.get('vision_analysis', '')}"
 
     user_text = (
-        f"Analyse this {pair} {tf} chart. "
-        + (f"Context: {context}" if context else "")
+        f"Analyse this {pair} {tf} chart."
+        + (f" Context: {context}" if context else "")
+        + vision_context
     )
 
-    payload = {
-        "model": OPENROUTER_MODEL,
-        "messages": [
-            {"role": "system", "content": _SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type":      "image_url",
-                        "image_url": {"url": chart_data_uri},    # ← correct URI
-                    },
-                    {"type": "text", "text": user_text},
-                ],
-            },
-        ],
-        "max_tokens": 512,
-        "temperature": 0.1,
-    }
+    messages = [
+        {"role": "system", "content": _SYSTEM_PROMPT},
+        {"role": "user", "content": user_text},
+    ]
 
-    headers = {
-        "Authorization":  f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type":   "application/json",
-        "HTTP-Referer":   "https://futuresbrain.app",
-        "X-Title":        "FuturesBrain Copilot",
-    }
+    result = await _call_ai_text(messages)
+    if "error" in result:
+        return result
+
+    content = result.get("content", "")
 
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                _OPENROUTER_URL,
-                json=payload,
-                headers=headers,
-                timeout=aiohttp.ClientTimeout(total=30),
-            ) as resp:
-                if resp.status != 200:
-                    text = await resp.text()
-                    logger.error("OpenRouter error %d: %s", resp.status, text[:300])
-                    return {"error": f"upstream_error_{resp.status}"}
-
-                data = await resp.json()
-
-    except asyncio.TimeoutError:
-        return {"error": "upstream_timeout"}
-    except aiohttp.ClientError as exc:
-        logger.error("Copilot network error: %s", exc)
-        return {"error": "network_error"}
-
-    # Parse JSON from model response
-    try:
-        content = data["choices"][0]["message"]["content"]
-        import json
-        # Strip markdown code fences if present
         content = content.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
-        result = json.loads(content)
-    except (KeyError, IndexError, json.JSONDecodeError, TypeError) as exc:
-        logger.warning("Copilot JSON parse error: %s | raw=%s", exc, str(data)[:200])
-        return {"error": "parse_error", "raw": str(data)[:500]}
+        parsed = json.loads(content)
+    except (json.JSONDecodeError, TypeError) as exc:
+        logger.warning("Copilot JSON parse error: %s | raw=%s", exc, content[:200])
+        return {"error": "parse_error", "raw": content[:500]}
 
-    await set_cached(cache_key, result)
-    return result
+    await set_cached(cache_key, parsed)
+    return parsed

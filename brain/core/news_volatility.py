@@ -9,7 +9,7 @@ from typing import Generator
 
 import MetaTrader5 as mt5
 
-from config.constants import (
+from brain.config.constants import (
     COUNTRY_CURRENCY_MAP,
     NEWS_IMPORTANCE_HIGH,
     NEWS_WINDOW_MINUTES,

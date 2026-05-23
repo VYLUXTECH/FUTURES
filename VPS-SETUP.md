@@ -8,12 +8,12 @@
 ## Architecture Overview
 
 ```
-Users (Expo App / Web)
+Users (Web App)
         │
         ▼
 ┌─────────────────────┐     HTTPS      ┌──────────────────┐
 │   Your Domain       │ ◄─────────────► │  Caddy (Reverse   │
-│   bot.yourdomain.com│                │  Proxy + SSL)     │
+│   bot.futuretraders.net             │  Proxy + SSL)     │
 └─────────────────────┘                └────────┬─────────┘
                                                 │ :8000
                                                 ▼
@@ -31,7 +31,7 @@ Users (Expo App / Web)
 ```
 
 **How it works for multiple users:**
-1. Each user signs up via the Expo app or web
+1. Each user signs up via the web app
 2. They connect their MT5 broker account (credentials saved encrypted to Supabase)
 3. The bot on your VPS reads credentials from Supabase, logs into MT5, and trades on their behalf
 4. All trades, signals, and settings are synced to Supabase in real-time
@@ -75,7 +75,7 @@ Go to your domain registrar (Cloudflare, Namecheap, GoDaddy, etc.) and add an **
 |------|------|-------|-----|
 | A | `bot` (or `app`, `trade`, etc.) | `203.0.113.50` (your VPS IP) | Auto |
 
-This creates `bot.yourdomain.com` pointing to your VPS.
+This creates `bot.futuretraders.net` pointing to your VPS.
 
 **Cloudflare (recommended):**
 1. Go to DNS → Add Record
@@ -85,7 +85,7 @@ This creates `bot.yourdomain.com` pointing to your VPS.
 
 **Verify it works:**
 ```cmd
-nslookup bot.yourdomain.com
+nslookup bot.futuretraders.net
 ```
 Should return your VPS IP. Propagation takes 1-48 hours (usually minutes with Cloudflare).
 
@@ -193,7 +193,7 @@ C:\futures-bot\
 │   ├── utils\
 │   └── api\
 ├── scripts\
-├── expo-app\
+├── web\
 ├── requirements.txt
 ├── .env
 └── ...
@@ -232,7 +232,7 @@ API_HOST=127.0.0.1
 API_PORT=8000
 
 # --- Allowed Origins (your domain + local dev) ---
-ALLOWED_ORIGINS=https://bot.yourdomain.com,http://localhost:3000,http://localhost:8081
+ALLOWED_ORIGINS=https://bot.futuretraders.net,http://localhost:3000,http://localhost:8081
 
 # --- Supabase (from Step 1.4) ---
 SUPABASE_URL=https://xxxxx.supabase.co
@@ -240,17 +240,20 @@ SUPABASE_KEY=your-anon-public-key-here
 SUPABASE_DB_URI=postgresql://postgres.xxxxx:YOUR_PASSWORD@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?sslmode=require
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
 
+# --- Supabase JWT Secret (find in Supabase Dashboard → Settings → API → JWT Secret) ---
+SUPABASE_JWT_SECRET=your-jwt-secret-here
+
 # --- Encryption (from Step 3.3) ---
 ENCRYPTION_KEY=your-generated-encryption-key-here
 
-# --- Expo App ---
+# --- Frontend Config (injected via /api/config) ---
 EXPO_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
 EXPO_PUBLIC_SUPABASE_KEY=your-anon-public-key-here
 
 # --- OpenRouter / AI Copilot (optional, for AI features) ---
-OPENROUTER_API_KEY=sk-or-v1-your-key-here
-OPENROUTER_MODEL=anthropic/claude-3.5-sonnet
+AI_BASE_URL=https://all-in-1-ais.officialhectormanuel.workers.dev
 
+AI_MODEL=deepseek
 # --- Logging ---
 LOG_LEVEL=INFO
 
@@ -261,11 +264,12 @@ TELEGRAM_ADMIN_ID_2=second-admin-id-optional
 ```
 
 **Replace all placeholders:**
-- `bot.yourdomain.com` → your actual subdomain
+- `bot.futuretraders.net` → your actual subdomain
 - `https://xxxxx.supabase.co` → your Supabase project URL
 - `your-anon-public-key-here` → from Supabase Settings → API
 - `SUPABASE_DB_URI` → the Transaction pooler connection string (port 6543)
 - `your-service-role-key-here` → from Supabase Settings → API (service_role secret)
+- `your-jwt-secret-here` → from Supabase Dashboard → Settings → API → JWT Secret
 - `your-generated-encryption-key-here` → from Step 3.3
 - Telegram values → create a bot via @BotFather on Telegram, get the token, and your user ID via @userinfobot
 
@@ -294,7 +298,7 @@ Press `Ctrl+C` to stop. If there are errors, fix them before proceeding.
 Create `C:\caddy\Caddyfile` (no file extension — use Notepad and save as "All files"):
 
 ```
-bot.yourdomain.com {
+bot.futuretraders.net {
     reverse_proxy 127.0.0.1:8000
 
     header {
@@ -306,7 +310,7 @@ bot.yourdomain.com {
 }
 ```
 
-Replace `bot.yourdomain.com` with your actual subdomain.
+Replace `bot.futuretraders.net` with your actual subdomain.
 
 ### Step 4.2: Test Caddy
 
@@ -317,12 +321,12 @@ caddy.exe run
 
 You should see:
 ```
-obtaining certificate: bot.yourdomain.com
+obtaining certificate: bot.futuretraders.net
 certificate obtained successfully
 certificate stored in: C:\Users\...\AppData\Local\Caddy\certificates\...
 ```
 
-Open `https://bot.yourdomain.com` in your browser — you should see a padlock and your bot's API response.
+Open `https://bot.futuretraders.net` in your browser — you should see a padlock and your bot's API response.
 
 Press `Ctrl+C` to stop.
 
@@ -416,18 +420,18 @@ nssm status CaddyProxy    → should show SERVICE_RUNNING
 
 ```cmd
 :: Check bot API is accessible via HTTPS
-curl https://bot.yourdomain.com/api/status
+curl https://bot.futuretraders.net/api/status
 
-:: Check via browser — open https://bot.yourdomain.com
+:: Check via browser — open https://bot.futuretraders.net
 ```
 
 ---
 
 ## Phase 7: Configure MT5 Credentials
 
-### Step 7.1: Via the Expo App (Recommended for Multi-User)
+### Step 7.1: Via the Web App (Recommended for Multi-User)
 
-1. Build and deploy your Expo app (see Phase 8)
+1. Navigate to https://bot.futuretraders.net
 2. User signs up → verifies email
 3. User goes to **Broker Connect** screen
 4. User enters their MT5 Login ID, Password, and selects server (Demo/Live)
@@ -455,54 +459,11 @@ SELECT id, email FROM auth.users;
 
 ---
 
-## Phase 8: Build & Deploy the Expo App
+## Phase 8: Frontend Deployment
 
-### Step 8.1: Install Node.js (on your local machine)
+The frontend is a static SPA served directly from the FastAPI backend (no build step required). See `web/index.html`, `web/style.css`, and `web/main.js`.
 
-Download from: https://nodejs.org/ (LTS version)
-
-### Step 8.2: Configure the Expo App
-
-Edit `expo-app/app.json` or the relevant config file to set your API URL:
-
-```json
-{
-  "expo": {
-    "extra": {
-      "apiUrl": "https://bot.yourdomain.com/api",
-      "supabaseUrl": "https://xxxxx.supabase.co",
-      "supabaseAnonKey": "your-anon-key"
-    }
-  }
-}
-```
-
-Also check `expo-app/constants/` or `expo-app/utils/` for any hardcoded URLs and update them.
-
-### Step 8.3: Build the App
-
-```cmd
-cd expo-app
-npm install
-npx expo start
-```
-
-**For testing on your phone:**
-- Install Expo Go app on iOS/Android
-- Scan the QR code from terminal
-
-**For production builds:**
-```cmd
-npx eas build --platform android
-npx eas build --platform ios
-```
-
-You'll need an EAS account (free tier available).
-
-### Step 8.4: Deploy to App Stores
-
-- **Google Play:** Upload the `.aab` file to Google Play Console
-- **Apple App Store:** Upload via Xcode or Transporter app
+All frontend updates are deployed by simply updating files in the `web/` directory and restarting the FastAPI server.
 
 ---
 
@@ -624,14 +585,14 @@ Update the `referral_link` with your actual broker partner link.
 
 ### Daily Checks
 
-1. **Bot status:** `curl https://bot.yourdomain.com/api/status` or `/health` on Telegram
+1. **Bot status:** `curl https://bot.futuretraders.net/api/status` or `/health` on Telegram
 2. **MT5 connection:** Ensure terminal is running and connected
 3. **Today's trades:** Check Supabase → Table Editor → `trades`
 4. **Error logs:** Check VPS console output or log files
 
 ### Weekly Checks
 
-1. **Caddy SSL cert:** Auto-renews, but verify with `curl -I https://bot.yourdomain.com`
+1. **Caddy SSL cert:** Auto-renews, but verify with `curl -I https://bot.futuretraders.net`
 2. **Disk space:** `dir C:\` — ensure enough free space
 3. **Windows Updates:** Apply security updates, restart if needed
 4. **Supabase usage:** Check project dashboard for row count, storage usage
@@ -714,7 +675,7 @@ Find exact name: MT5 → File → Login to Trade Account → look at Server drop
 
 ### HTTPS Not Working
 
-1. Check DNS: `nslookup bot.yourdomain.com` → should return VPS IP
+1. Check DNS: `nslookup bot.futuretraders.net` → should return VPS IP
 2. Check port 80 is open (Caddy needs it for Let's Encrypt)
 3. Cloudflare SSL/TLS mode must be **Full** or **Full (strict)**
 4. Check Caddy logs: `C:\caddy\caddy.exe run` (run manually to see errors)
@@ -762,6 +723,8 @@ Before going live, verify EVERY item:
 - [ ] Windows Firewall blocks port 8000 from external
 - [ ] Supabase RLS policies are enabled on ALL tables
 - [ ] `ENCRYPTION_KEY` is unique and backed up securely
+- [ ] `SUPABASE_JWT_SECRET` is configured (not empty)
+- [ ] `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_KEY` are set for frontend config
 - [ ] Telegram admin IDs are YOUR IDs only
 - [ ] `SUPABASE_SERVICE_ROLE_KEY` is never exposed to frontend
 - [ ] VPS has a strong administrator password
@@ -782,10 +745,10 @@ Before going live, verify EVERY item:
 | `nssm status FuturesBot` | Check service status |
 | `nssm start CaddyProxy` | Start HTTPS proxy |
 | `nssm stop CaddyProxy` | Stop HTTPS proxy |
-| `curl https://bot.yourdomain.com/api/status` | Check bot health |
+| `curl https://bot.futuretraders.net/api/status` | Check bot health |
 | `taskkill /F /IM terminal64.exe` | Kill MT5 process |
 | `pip install -r requirements.txt` | Install/update dependencies |
-| `nslookup bot.yourdomain.com` | Verify DNS |
+| `nslookup bot.futuretraders.net` | Verify DNS |
 | `nssm edit FuturesBot` | Edit service config GUI |
 
 ---
