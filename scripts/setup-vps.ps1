@@ -55,20 +55,31 @@ if (-not $git) {
 Write-Host ""
 Write-Host "[2/8] Getting repository..." -ForegroundColor Yellow
 
-# Clean up failed directory from previous runs
+# Kill any processes that might lock files
+try { taskkill /F /IM caddy.exe 2>&1 | Out-Null } catch {}
+try { taskkill /F /IM caddy_windows_amd64.exe 2>&1 | Out-Null } catch {}
+try { taskkill /F /IM python.exe 2>&1 | Out-Null } catch {}
+try { taskkill /F /IM terminal64.exe 2>&1 | Out-Null } catch {}
+Start-Sleep -Seconds 2
+
+# Fresh clone every time
 if (Test-Path $ROOT) {
-    if (-not (Test-Path "$ROOT\.git")) {
-        Write-Host "  Removing incomplete directory from previous run..." -ForegroundColor Yellow
-        try { taskkill /F /IM caddy.exe 2>&1 | Out-Null } catch {}
-        try { taskkill /F /IM caddy_windows_amd64.exe 2>&1 | Out-Null } catch {}
-        try { taskkill /F /IM python.exe 2>&1 | Out-Null } catch {}
-        try { taskkill /F /IM terminal64.exe 2>&1 | Out-Null } catch {}
-        Start-Sleep -Seconds 2
+    Write-Host "  Removing old directory..." -ForegroundColor Yellow
+    cmd /c "rmdir /S /Q $ROOT 2>nul"
+    if (Test-Path $ROOT) {
+        Write-Host "  Retrying deletion..." -ForegroundColor Yellow
+        Start-Sleep -Seconds 3
         cmd /c "rmdir /S /Q $ROOT 2>nul"
-        if (Test-Path $ROOT) { Remove-Item -Recurse -Force $ROOT -ErrorAction SilentlyContinue }
-    } else {
-        Write-Host "  Repository already cloned. Pulling latest..." -ForegroundColor Yellow
-        Set-Location $ROOT
+    }
+}
+git clone $REPO $ROOT
+if (-not (Test-Path "$ROOT\requirements.txt")) {
+    Write-Host "  ERROR: Clone failed - requirements.txt not found." -ForegroundColor Red
+    Write-Host "  Check network connectivity and try again." -ForegroundColor Red
+    exit 1
+}
+Write-Host "  Repository cloned." -ForegroundColor Green
+Set-Location $ROOT
         git pull
     }
 }
