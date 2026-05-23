@@ -18,14 +18,12 @@ Write-Host ""
 # ---- Prerequisites check -------------------------------------------
 Write-Host "[1/8] Checking prerequisites..." -ForegroundColor Yellow
 
-# Admin check
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) {
     Write-Host "ERROR: Run this script as Administrator!" -ForegroundColor Red
     exit 1
 }
 
-# Python check
 $py = (Get-Command "python" -ErrorAction SilentlyContinue)
 if (-not $py) {
     Write-Host "  Python not found. Downloading Python 3.11..." -ForegroundColor Yellow
@@ -40,7 +38,6 @@ if (-not $py) {
     Write-Host "  $ver" -ForegroundColor Green
 }
 
-# Git check
 $git = (Get-Command "git" -ErrorAction SilentlyContinue)
 if (-not $git) {
     Write-Host "  Git not found. Downloading Git..." -ForegroundColor Yellow
@@ -56,14 +53,23 @@ if (-not $git) {
 
 # ---- Clone repo ----------------------------------------------------
 Write-Host ""
-Write-Host "[2/8] Cloning repository..." -ForegroundColor Yellow
+Write-Host "[2/8] Getting repository..." -ForegroundColor Yellow
+
+# Clean up failed directory from previous runs
 if (Test-Path $ROOT) {
-    Write-Host "  Directory exists. Pulling latest..." -ForegroundColor Yellow
-    Set-Location $ROOT
-    git pull
-} else {
+    if (-not (Test-Path "$ROOT\.git")) {
+        Write-Host "  Removing incomplete directory from previous run..." -ForegroundColor Yellow
+        Remove-Item -Recurse -Force $ROOT
+    } else {
+        Write-Host "  Repository already cloned. Pulling latest..." -ForegroundColor Yellow
+        Set-Location $ROOT
+        git pull
+    }
+}
+
+if (-not (Test-Path $ROOT)) {
     git clone $REPO $ROOT
-    Write-Host "  Cloned to $ROOT" -ForegroundColor Green
+    Write-Host "  Repository cloned." -ForegroundColor Green
 }
 Set-Location $ROOT
 
@@ -77,36 +83,26 @@ Write-Host "  Dependencies installed." -ForegroundColor Green
 Write-Host ""
 Write-Host "[4/8] Generating encryption key..." -ForegroundColor Yellow
 $encKey = python -c "from cryptography.fernet import Fernet; import base64; print(base64.urlsafe_b64encode(Fernet.generate_key()).decode())"
+if (-not $encKey) {
+    Write-Host "  ERROR: Failed to generate encryption key." -ForegroundColor Red
+    exit 1
+}
 Write-Host "  Encryption key generated." -ForegroundColor Green
 
 # ---- Create .env ---------------------------------------------------
 Write-Host ""
 Write-Host "[5/8] Creating .env file..." -ForegroundColor Yellow
 
-$envVars = @{
-    "API_HOST" = "127.0.0.1"
-    "API_PORT" = "8000"
-    "ALLOWED_ORIGINS" = "https://bot.futuretraders.net"
-    "SUPABASE_URL" = ""
-    "SUPABASE_KEY" = ""
-    "SUPABASE_DB_URI" = ""
-    "SUPABASE_SERVICE_ROLE_KEY" = ""
-    "SUPABASE_JWT_SECRET" = ""
-    "ENCRYPTION_KEY" = $encKey
-    "AI_BASE_URL" = "https://all-in-1-ais.officialhectormanuel.workers.dev"
-    "AI_MODEL" = "deepseek"
-    "LOG_LEVEL" = "INFO"
-    "TELEGRAM_ADMIN_BOT_TOKEN" = ""
-    "TELEGRAM_ADMIN_ID_1" = ""
-    "TELEGRAM_ADMIN_ID_2" = ""
-}
+Write-Host "  Enter your credentials (press Enter to skip optional fields):" -ForegroundColor White
 
-Write-Host "  Enter your Supabase and Telegram credentials (press Enter to skip optional fields):" -ForegroundColor White
-foreach ($key in $envVars.Keys) {
-    if ($envVars[$key] -ne "") { continue }
-    $val = Read-Host "  $key"
-    $envVars[$key] = $val
-}
+$supabaseUrl = Read-Host "  SUPABASE_URL"
+$supabaseKey = Read-Host "  SUPABASE_KEY (anon)"
+$supabaseDbUri = Read-Host "  SUPABASE_DB_URI"
+$supabaseServiceRole = Read-Host "  SUPABASE_SERVICE_ROLE_KEY"
+$supabaseJwt = Read-Host "  SUPABASE_JWT_SECRET"
+$telegramToken = Read-Host "  TELEGRAM_ADMIN_BOT_TOKEN (optional)"
+$telegramId1 = Read-Host "  TELEGRAM_ADMIN_ID_1 (optional)"
+$telegramId2 = Read-Host "  TELEGRAM_ADMIN_ID_2 (optional)"
 
 $lines = @(
     "# ============================================================"
@@ -121,30 +117,30 @@ $lines = @(
     "ALLOWED_ORIGINS=https://bot.futuretraders.net"
     ""
     "# --- Supabase ---"
-    "SUPABASE_URL=$($envVars['SUPABASE_URL'])"
-    "SUPABASE_KEY=$($envVars['SUPABASE_KEY'])"
-    "SUPABASE_DB_URI=$($envVars['SUPABASE_DB_URI'])"
-    "SUPABASE_SERVICE_ROLE_KEY=$($envVars['SUPABASE_SERVICE_ROLE_KEY'])"
-    "SUPABASE_JWT_SECRET=$($envVars['SUPABASE_JWT_SECRET'])"
+    "SUPABASE_URL=$supabaseUrl"
+    "SUPABASE_KEY=$supabaseKey"
+    "SUPABASE_DB_URI=$supabaseDbUri"
+    "SUPABASE_SERVICE_ROLE_KEY=$supabaseServiceRole"
+    "SUPABASE_JWT_SECRET=$supabaseJwt"
     ""
     "# --- Encryption ---"
     "ENCRYPTION_KEY=$encKey"
     ""
     "# --- AI Copilot ---"
-    "AI_BASE_URL=$($envVars['AI_BASE_URL'])"
-    "AI_MODEL=$($envVars['AI_MODEL'])"
+    "AI_BASE_URL=https://all-in-1-ais.officialhectormanuel.workers.dev"
+    "AI_MODEL=deepseek"
     ""
     "# --- Logging ---"
     "LOG_LEVEL=INFO"
     ""
     "# --- Telegram Admin Bot ---"
-    "TELEGRAM_ADMIN_BOT_TOKEN=$($envVars['TELEGRAM_ADMIN_BOT_TOKEN'])"
-    "TELEGRAM_ADMIN_ID_1=$($envVars['TELEGRAM_ADMIN_ID_1'])"
-    "TELEGRAM_ADMIN_ID_2=$($envVars['TELEGRAM_ADMIN_ID_2'])"
+    "TELEGRAM_ADMIN_BOT_TOKEN=$telegramToken"
+    "TELEGRAM_ADMIN_ID_1=$telegramId1"
+    "TELEGRAM_ADMIN_ID_2=$telegramId2"
 )
 
 $lines -join "`r`n" | Out-File -FilePath "$ROOT\.env" -Encoding ascii
-Write-Host "  .env created at $ROOT\.env" -ForegroundColor Green
+Write-Host "  .env created." -ForegroundColor Green
 
 # ---- Install and configure Cloudflare Tunnel -----------------------
 Write-Host ""
@@ -161,32 +157,31 @@ if (-not (Test-Path "$cfDir\cloudflared.exe")) {
 
 $env:Path += ";$cfDir"
 
-Write-Host "  Starting authentication..." -ForegroundColor Yellow
-Write-Host "  A browser will open. Log in to Cloudflare and authorize." -ForegroundColor Cyan
-Write-Host "  Press Enter after you complete the authentication..." -ForegroundColor White
+Write-Host "  A browser will open for Cloudflare login." -ForegroundColor Cyan
+Write-Host "  Log in, select your account, then come back here and press Enter." -ForegroundColor White
 $null = Read-Host
 cloudflared tunnel login | Out-String | Write-Host
 
-# Create tunnel
 $tunnelName = "futures-bot"
 Write-Host "  Creating tunnel '$tunnelName'..." -ForegroundColor Yellow
 $tunnelResult = cloudflared tunnel create $tunnelName 2>&1 | Out-String
 Write-Host $tunnelResult
 
-# Extract tunnel ID
 $tunnelId = ""
-if ($tunnelResult -match "Created tunnel\s+\S+\s+with id\s+(\S+)") {
+if ($tunnelResult -match "id\s+(\S+)") {
     $tunnelId = $matches[1]
-} elseif ($tunnelResult -match "Tunnel 'futures-bot' already exists and has id\s+(\S+)") {
-    $tunnelId = $matches[1]
+} elseif ($tunnelResult -match "already exists") {
+    Write-Host "  Tunnel already exists. Fetching ID..." -ForegroundColor Yellow
+    $listResult = cloudflared tunnel list 2>&1 | Out-String
+    if ($listResult -match "futures-bot\s+(\S+)") {
+        $tunnelId = $matches[1]
+    }
 }
 
 if (-not $tunnelId) {
-    Write-Host "  ERROR: Could not find tunnel ID. Check cloudflared output above." -ForegroundColor Red
-    Write-Host "  You will need to configure DNS routing manually after setup." -ForegroundColor Yellow
+    Write-Host "  ERROR: Could not find tunnel ID. Check output above." -ForegroundColor Red
 }
 
-# Write config.yml
 $credFile = "$env:USERPROFILE\.cloudflared\$tunnelId.json"
 $configYml = @"
 tunnel: $tunnelId
@@ -198,16 +193,14 @@ ingress:
   - service: http_status:404
 "@
 $configYml | Out-File -FilePath "$cfDir\config.yml" -Encoding ascii
-Write-Host "  Config written to $cfDir\config.yml" -ForegroundColor Green
+Write-Host "  Config written." -ForegroundColor Green
 
-# Route DNS
 if ($tunnelId) {
-    Write-Host "  Routing bot.futuretraders.net to tunnel..." -ForegroundColor Yellow
-    cloudflared tunnel route dns $tunnelName bot.futuretraders.net 2>&1 | Out-String | Write-Host
+    Write-Host "  Routing DNS..." -ForegroundColor Yellow
+    cloudflared tunnel route dns $tunnelName bot.futuretraders.net 2>&1
 }
 
-# Install as Windows service
-Write-Host "  Installing tunnel as Windows service..." -ForegroundColor Yellow
+Write-Host "  Installing tunnel as service..." -ForegroundColor Yellow
 cloudflared service install 2>&1 | Out-String | Write-Host
 Write-Host "  Cloudflare Tunnel configured." -ForegroundColor Green
 
@@ -232,13 +225,12 @@ $pyPath = (Get-Command python).Source
 
 & "$nssmDir\nssm.exe" install FuturesBot @"
 $pyPath
-"@
+"@ 2>&1 | Out-Null
 & "$nssmDir\nssm.exe" set FuturesBot AppParameters "backend/main.py"
 & "$nssmDir\nssm.exe" set FuturesBot AppDirectory "$ROOT"
 & "$nssmDir\nssm.exe" set FuturesBot DisplayName "FUTURES Trading Bot"
 & "$nssmDir\nssm.exe" set FuturesBot Description "AI-Powered Forex Trading Bot"
 & "$nssmDir\nssm.exe" set FuturesBot Start SERVICE_AUTO_START
-
 Write-Host "  Bot service registered." -ForegroundColor Green
 
 # ---- Start everything ----------------------------------------------
