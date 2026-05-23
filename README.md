@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="web/assets/images/logo.jpg" alt="FUTURES Logo" width="200">
+</p>
+
 # FUTURES Trading Bot
 
 An automated futures trading platform powered by AI-driven market analysis, real-time signals, and a responsive web dashboard.
