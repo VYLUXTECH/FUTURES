@@ -1,10 +1,11 @@
 # Wipes C:\futures-bot, downloads latest setup-vps.ps1, and runs it
 # Run in PowerShell as Administrator
+Set-Location C:\
 Remove-Item -Recurse -Force "C:\futures-bot" -ErrorAction SilentlyContinue
 Remove-Item -Recurse -Force "C:\futures" -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 2
 Remove-Item "$env:TEMP\setup.ps1" -Force -ErrorAction SilentlyContinue
 $wc = New-Object System.Net.WebClient
 $wc.Headers.Add("Cache-Control", "no-cache")
-$wc.DownloadFile("https://raw.githubusercontent.com/VYLUXTECHINC/FUTURES/6fd0d59/scripts/setup-vps.ps1", "$env:TEMP\setup.ps1")
+$wc.DownloadFile("https://raw.githubusercontent.com/VYLUXTECHINC/FUTURES/acf4790/scripts/setup-vps.ps1", "$env:TEMP\setup.ps1")
 & "$env:TEMP\setup.ps1"
