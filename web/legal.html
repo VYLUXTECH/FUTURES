@@ -49,7 +49,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 1rem;
+      padding: 2rem;
     }
     .legal-card {
       background: var(--card-bg);
@@ -58,10 +58,10 @@
       border: 1px solid var(--card-border);
       border-radius: var(--radius);
       box-shadow: var(--shadow);
-      padding: 2rem;
+      padding: 2.5rem;
       width: 100%;
-      max-width: 600px;
-      max-height: 85vh;
+      max-width: 800px;
+      max-height: 88vh;
       overflow-y: auto;
       position: relative;
     }
@@ -69,12 +69,12 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 1.5rem;
-      padding-bottom: 1rem;
+      margin-bottom: 2rem;
+      padding-bottom: 1.25rem;
       border-bottom: 1px solid var(--border);
     }
     .legal-header h1 {
-      font-size: 1.25rem;
+      font-size: 1.35rem;
       font-weight: 700;
       color: var(--text-heading);
     }
@@ -84,11 +84,14 @@
       cursor: pointer;
       color: var(--text);
       font-weight: 600;
-      font-size: 0.9rem;
+      font-size: 0.95rem;
       font-family: 'Inter', sans-serif;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      transition: background 0.2s;
     }
     .back-btn:hover {
-      text-decoration: underline;
+      background: var(--input-bg);
     }
     .version-badge {
       display: inline-block;
@@ -101,11 +104,11 @@
       color: var(--text-muted);
       margin-bottom: 1rem;
     }
-    .legal-content { font-size: 0.9rem; line-height: 1.6; color: var(--text); }
-    .legal-content h3 { font-size: 1rem; font-weight: 700; margin: 1.25rem 0 0.5rem; color: var(--text-heading); }
-    .legal-content p { margin-bottom: 0.75rem; }
-    .legal-content ul { padding-left: 1.25rem; margin-bottom: 0.75rem; }
-    .legal-content li { margin-bottom: 0.4rem; }
+    .legal-content { font-size: 0.95rem; line-height: 1.75; color: var(--text); }
+    .legal-content h3 { font-size: 1.05rem; font-weight: 700; margin: 1.5rem 0 0.6rem; color: var(--text-heading); }
+    .legal-content p { margin-bottom: 0.85rem; }
+    .legal-content ul { padding-left: 1.5rem; margin-bottom: 0.85rem; }
+    .legal-content li { margin-bottom: 0.5rem; }
     .legal-content strong { font-weight: 700; }
     .legal-content .critical { color: var(--error); font-weight: 600; }
     .hidden { display: none !important; }
