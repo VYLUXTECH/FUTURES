@@ -1954,6 +1954,11 @@
             };
             if (initMap[pageId]) initMap[pageId]();
           }
+          var resetMap = {
+            'page-forgot-password': resetForgotPasswordPage,
+            'page-verification': resetVerificationPage
+          };
+          if (resetMap[pageId]) resetMap[pageId]();
         }
         updateThemeIcons();
       };
@@ -2283,6 +2288,20 @@
         fpCheckOtpComplete();
       }
 
+      function resetForgotPasswordPage() {
+        document.getElementById('fp-step1').classList.remove('hidden');
+        document.getElementById('fp-step2').classList.add('hidden');
+        document.getElementById('fp-step3').classList.add('hidden');
+        document.getElementById('resetEmail').value = '';
+        document.getElementById('fpNewPassword').value = '';
+        document.getElementById('fpConfirmPassword').value = '';
+        document.getElementById('fpResendBtn').disabled = false;
+        document.getElementById('fpOtpTimer').textContent = '';
+        clearInterval(fpState.timerInterval);
+        fpState.timerInterval = null;
+        fpClearOtpInputs();
+      }
+
       function fpGetOtpValue() {
         var inputs = document.querySelectorAll('#fpOtpContainer .otp-input');
         return Array.from(inputs).map(function (i) { return i.value; }).join('');
@@ -2460,6 +2479,23 @@
         verifCheckComplete();
         var firstInput = document.querySelector('#verifOtpContainer .otp-input');
         if (firstInput) firstInput.focus();
+      }
+
+      function resetVerificationPage() {
+        var inputs = document.querySelectorAll('#verifOtpContainer .otp-input');
+        inputs.forEach(function (i) {
+          i.value = '';
+          i.classList.remove('filled');
+        });
+        clearInterval(verifState.interval);
+        verifState.timer = 60;
+        verifState.interval = null;
+        verifState.verified = false;
+        document.getElementById('verifResendBtn').disabled = true;
+        document.getElementById('verifTimer').textContent = '(60s)';
+        document.getElementById('verifVerifyBtn').disabled = true;
+        verifStartTimer();
+        if (inputs[0]) inputs[0].focus();
       }
 
       function verifGetOtpValue() {
