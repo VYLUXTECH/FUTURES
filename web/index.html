@@ -2117,16 +2117,7 @@
         container.addEventListener("click", handleTap);
         container.addEventListener("touchstart", handleTap);
 
-        window.addEventListener("load", function () {
-          startAnimation();
-        });
-
-        // If splash is shown after load, start animation immediately
-        if (document.readyState === 'complete') {
-          startAnimation();
-        } else {
-          // The load listener above handles it
-        }
+        startAnimation();
 
         window.addEventListener("beforeunload", function () {
           cashOutAudio.pause();
