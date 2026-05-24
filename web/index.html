@@ -563,45 +563,14 @@
       cursor: not-allowed;
     }
 
-    #page-signup .agree-check {
-      display: flex;
-      align-items: flex-start;
-      gap: 0.5rem;
+    #page-signup .terms-link {
+      text-align: center;
       margin: 0.3rem 0 0.5rem;
-      cursor: pointer;
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      line-height: 1.35;
     }
-    #page-signup .agree-check input {
-      appearance: none;
-      width: 18px;
-      height: 18px;
-      border: 2px solid var(--text-muted);
-      border-radius: 4px;
-      margin-top: 0.1rem;
-      flex-shrink: 0;
-      cursor: pointer;
-      position: relative;
-      transition: border-color 0.2s, background 0.2s;
-    }
-    #page-signup .agree-check input:checked {
-      border-color: var(--primary);
-      background: var(--primary);
-    }
-    #page-signup .agree-check input:checked::after {
-      content: "✓";
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      color: var(--primary-fg);
-      font-size: 12px;
-      font-weight: bold;
-    }
-    #page-signup .agree-check a {
+    #page-signup .terms-link a {
       color: var(--text);
       font-weight: 600;
+      font-size: 0.8rem;
       text-decoration: underline;
       cursor: pointer;
     }
@@ -1643,11 +1612,8 @@
           </div>
           <p class="error" id="signupError"></p>
           <p class="success" id="signupSuccess"></p>
-          <label class="agree-check">
-            <input type="checkbox" id="agreeCheck" />
-            <span>I agree to the <a onclick="loadPage('page-legal', 'legal.html'); return false;">Terms &amp; Conditions</a> &amp; <a onclick="loadPage('page-legal', 'legal.html'); return false;">Risk Disclosure</a></span>
-          </label>
-          <button type="submit" class="btn" id="signupBtn" disabled>Create Account</button>
+          <div class="terms-link"><a onclick="loadPage('page-legal', 'legal.html'); return false;">Terms &amp; Conditions</a></div>
+          <button type="submit" class="btn" id="signupBtn">Create Account</button>
           <div class="footer">
             Already have an account? <a onclick="showPage('page-sign')">Login</a>
           </div>
@@ -2165,11 +2131,7 @@
          SIGNUP PAGE
          ============================================================ */
       function initSignupPage() {
-        var agreeCheck = document.getElementById('agreeCheck');
         var signupBtn = document.getElementById('signupBtn');
-        agreeCheck.addEventListener('change', function () {
-          signupBtn.disabled = !agreeCheck.checked;
-        });
         document.getElementById('signupForm').addEventListener('submit', async function (e) {
           e.preventDefault();
           var name = document.getElementById('suName').value;
@@ -2183,10 +2145,6 @@
           successEl.textContent = '';
           if (password !== confirm) {
             errorEl.textContent = 'Passwords do not match.';
-            return;
-          }
-          if (!agreeCheck.checked) {
-            errorEl.textContent = 'Please agree to the Terms & Conditions and Risk Disclosure.';
             return;
           }
           if (!supabase) {
