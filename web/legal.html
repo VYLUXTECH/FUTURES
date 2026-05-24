@@ -47,75 +47,48 @@
       font-family: 'Inter', sans-serif;
       transition: background 0.3s ease, color 0.3s ease;
       display: flex;
-      justify-content: center;
-      padding: 0;
-    }
-    .app-container {
-      width: 100%;
-      max-width: 720px;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      position: relative;
-    }
-    .header {
-      padding: 1rem;
-      display: flex;
       align-items: center;
-      justify-content: space-between;
-      background: var(--bg);
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-      z-index: 10;
-    }
-    .back-btn {
-      background: none; border: none; cursor: pointer; color: var(--text);
-      display: flex; align-items: center; gap: 0.25rem; font-weight: 600; font-size: 0.95rem;
-    }
-    .page-title { font-size: 1.1rem; font-weight: 700; color: var(--text-heading); }
-    .theme-toggle {
-      width: 40px; height: 40px; background: var(--card-bg); border: 1px solid var(--card-border);
-      border-radius: 50%; display: flex; align-items: center; justify-content: center;
-      cursor: pointer; color: var(--text); transition: var(--transition);
-    }
-    .theme-toggle:hover { transform: scale(1.05); }
-    .content-area {
-      flex: 1;
-      overflow-y: auto;
+      justify-content: center;
       padding: 1rem;
-      display: flex;
-      flex-direction: column;
-      gap: 1.5rem;
     }
-    .card {
+    .legal-card {
       background: var(--card-bg);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       border: 1px solid var(--card-border);
       border-radius: var(--radius);
       box-shadow: var(--shadow);
-      padding: 1.25rem;
-      transition: background 0.3s ease, border-color 0.3s ease;
+      padding: 2rem;
+      width: 100%;
+      max-width: 600px;
+      max-height: 85vh;
+      overflow-y: auto;
+      position: relative;
     }
-    .section-divider {
+    .legal-header {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
-      padding: 0.5rem 0;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
     }
-    .section-divider::before,
-    .section-divider::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--border);
+    .legal-header h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text-heading);
     }
-    .section-divider span {
-      font-size: 0.75rem;
+    .back-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text);
       font-weight: 600;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
+      font-size: 0.9rem;
+      font-family: 'Inter', sans-serif;
+    }
+    .back-btn:hover {
+      text-decoration: underline;
     }
     .version-badge {
       display: inline-block;
@@ -135,126 +108,130 @@
     .legal-content li { margin-bottom: 0.4rem; }
     .legal-content strong { font-weight: 700; }
     .legal-content .critical { color: var(--error); font-weight: 600; }
+    .hidden { display: none !important; }
+    @media (max-width: 640px) {
+      body { padding: 0.5rem; align-items: flex-start; padding-top: 1rem; }
+      .legal-card { padding: 1.25rem; max-height: none; }
+    }
   </style>
 </head>
 <body>
-  <div class="app-container">
-    <header class="header">
+  <div class="legal-card" id="legalCard">
+
+    <div class="legal-header">
+      <h1 id="pageTitle">Terms & Conditions</h1>
       <button class="back-btn" onclick="goBack()">← Back</button>
-      <h1 class="page-title">Legal Agreements</h1>
-      <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
-        <svg id="iconSun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
-        <svg id="iconMoon" class="hidden" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-      </button>
-    </header>
-
-    <div class="content-area">
-      <div class="card legal-content">
-        <span class="version-badge">Effective: May 07, 2026</span>
-        <h3>1. Acknowledgement of Extreme Risk</h3>
-        <p>Forex trading on margin is <strong>ONE OF THE RISKIEST FORMS OF INVESTMENT</strong>. You understand that automated trading software may exhibit unexpected behaviour due to market volatility, software errors, or connectivity issues. You accept <strong>full responsibility</strong> for all trading outcomes.</p>
-        
-        <h3>2. No Financial or Investment Advice</h3>
-        <p>FUTURES does <strong>not</strong> provide financial, investment, legal, tax, or trading advice. All information, chat responses, and software features are for informational and educational purposes only. <strong>Not Financial Advice.</strong></p>
-        
-        <h3>3. User Solely Responsible for All Trades</h3>
-        <p>The Platform is execution-only. You are solely and exclusively responsible for all trading decisions and positions, regardless of whether placed manually or automatically. <strong>No fiduciary duty is assumed by VYLUX TECH INC.</strong></p>
-        
-        <h3>4. Eligibility & Representations</h3>
-        <p>You warrant that you are ≥18, understand leveraged Forex risks, have sufficient capital to bear losses, and your use complies with local laws. We reserve the right to refuse service at our discretion.</p>
-        
-        <h3>5. Account Registration & Security</h3>
-        <p>You are responsible for maintaining credential confidentiality and all activities under your account. Notify us immediately of unauthorised use.</p>
-        
-        <h3>6. Subscription Packages & Fees</h3>
-        <p>Access requires a subscription (TRIAL, SPARK, SURGE, MEGA). <span class="critical">ALL FEES ARE FINAL AND NON-REFUNDABLE</span> regardless of profitability or unused trades. Fees are processed via Flutterwave. We may change fees with 30 days' notice.</p>
-        
-        <h3>7. Prohibited Conduct</h3>
-        <p>You agree not to reverse-engineer, disable security, engage in fraud/money laundering, or access other users' data.</p>
-        
-        <h3>8. Technical Limitations & Third-Party Services</h3>
-        <p>We rely on MT5, Supabase, Flutterwave, and cloud infrastructure. We are not responsible for third-party uptime, accuracy, or failures. Internet/electronic delays are inherent.</p>
-        
-        <h3>9. DISCLAIMER OF WARRANTIES</h3>
-        <p>THE PLATFORM IS PROVIDED <strong>"AS IS" AND "AS AVAILABLE"</strong>. WE SPECIFICALLY DISCLAIM ALL IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, NON-INFRINGEMENT, ACCURACY, AND SECURITY. NO GUARANTEE OF PROFITABILITY OR UNINTERRUPTED SERVICE IS MADE.</p>
-        
-        <h3>10. LIMITATION OF LIABILITY</h3>
-        <p class="critical">TO THE MAXIMUM EXTENT PERMITTED BY LAW, VYLUX TECH INC. SHALL NOT BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING LOSS OF PROFITS OR TRADING LOSSES. OUR AGGREGATE LIABILITY SHALL NOT EXCEED THE TOTAL FEES PAID BY YOU IN THE SIX (6) MONTHS IMMEDIATELY PRECEDING THE CLAIM.</p>
-        
-        <h3>11. Indemnification</h3>
-        <p>You agree to indemnify and hold harmless VYLUX TECH INC. from any claims arising from your use, breach of terms, or negligence.</p>
-        
-        <h3>12. Governing Law & Dispute Resolution</h3>
-        <p class="critical">This Agreement is governed by the laws of the <strong>Republic of Uganda</strong>. Any dispute shall be resolved by binding arbitration in Kampala under the Uganda Arbitration Centre rules. <strong>YOU WAIVE THE RIGHT TO A JURY TRIAL AND CLASS ACTION.</strong></p>
-        
-        <h3>13. Termination</h3>
-        <p>You may terminate by deleting your account (no refunds). We may suspend/terminate for breach, fraud, or non-payment. Upon termination, remaining trades are forfeited.</p>
-        
-        <h3>14. Modifications</h3>
-        <p>We may amend terms by posting. Continued use constitutes acceptance. If you disagree, you must stop using the Platform.</p>
-        
-        <h3>15. Entire Agreement & Severability</h3>
-        <p>This Agreement, Privacy Policy, and Risk Disclosure constitute the entire agreement. If any provision is invalid, the remainder remains enforceable.</p>
-        
-        <h3>16. Survival</h3>
-        <p>Sections 1, 3, 9, 10, 11, 12, and indemnification clauses survive termination.</p>
-        
-        <h3>17. Contact</h3>
-        <p>Questions? Email: support@futuretraders.com | Whatsapp: +256704909060</p>
-      </div>
-
-      <div class="section-divider"><span>Risk Disclosure</span></div>
-
-      <div class="card legal-content">
-        <span class="version-badge">Effective: May 07, 2026</span>
-        <h3>⚠️ IMPORTANT: READ CAREFULLY</h3>
-        <p>Trading foreign exchange on margin carries a <strong>HIGH LEVEL OF RISK</strong> and may not be suitable for all investors. Leverage can work against you. <span class="critical">YOU COULD SUSTAIN A TOTAL LOSS OF YOUR INITIAL CAPITAL.</span></p>
-        
-        <h3>1. High Risk of Loss</h3>
-        <p>You should not invest money you cannot afford to lose entirely. Past performance does not guarantee future results.</p>
-        
-        <h3>2. Automated Trading Software Risks</h3>
-        <p>The FUTURES bot is autonomous. Risks include: technical failures, connectivity issues, broker/MT5 limitations, market volatility, slippage, and news events. The bot mitigates but <strong>cannot eliminate</strong> these risks.</p>
-        
-        <h3>3. No Guarantee of Profit</h3>
-        <p>Historical performance is not indicative of future results. Markets are influenced by unpredictable factors. No assurance of target risk-reward ratios is made.</p>
-        
-        <h3>4. User Responsibility</h3>
-        <p>You are solely responsible for configuring parameters, monitoring balance, and disabling the bot when appropriate. The bot is a tool, not an advisor.</p>
-        
-        <h3>5. No Advisory or Fiduciary Duty</h3>
-        <p>VYLUX TECH INC. is not registered as an investment adviser. No fiduciary relationship exists. We have no duty to evaluate trade suitability.</p>
-        
-        <h3>6. Third-Party Services</h3>
-        <p>We rely on MT5, chart providers, Supabase, and Flutterwave. <strong>We are not responsible for losses resulting from third-party failure or misperformance.</strong></p>
-        
-        <h3>7. Leverage Risks</h3>
-        <p>Leverage magnifies gains and losses. A small adverse movement can quickly deplete your account. Risk settings do not limit total loss over multiple trades.</p>
-        
-        <h3>8. Force Majeure</h3>
-        <p>We are not liable for delays/failures due to acts of God, war, internet failures, power outages, or third-party interruptions.</p>
-        
-        <h3>9. No Refund Policy</h3>
-        <p class="critical">All subscription fees are non-refundable regardless of performance, technical difficulties, or other reasons. By purchasing, you accept full risk.</p>
-        
-        <h3>10. Acknowledgement</h3>
-        <p>I confirm I have read this disclosure, understand the high risks, accept sole responsibility for outcomes, and will not hold VYLUX TECH INC. liable for financial or technical losses.</p>
-      </div>
     </div>
+
+    <!-- TERMS & CONDITIONS -->
+    <div id="termsContent" class="legal-content">
+      <span class="version-badge">Effective: May 07, 2026</span>
+      <h3>1. Acknowledgement of Extreme Risk</h3>
+      <p>Forex trading on margin is <strong>ONE OF THE RISKIEST FORMS OF INVESTMENT</strong>. You understand that automated trading software may exhibit unexpected behaviour due to market volatility, software errors, or connectivity issues. You accept <strong>full responsibility</strong> for all trading outcomes.</p>
+      
+      <h3>2. No Financial or Investment Advice</h3>
+      <p>FUTURES does <strong>not</strong> provide financial, investment, legal, tax, or trading advice. All information, chat responses, and software features are for informational and educational purposes only. <strong>Not Financial Advice.</strong></p>
+      
+      <h3>3. User Solely Responsible for All Trades</h3>
+      <p>The Platform is execution-only. You are solely and exclusively responsible for all trading decisions and positions, regardless of whether placed manually or automatically. <strong>No fiduciary duty is assumed by VYLUX TECH INC.</strong></p>
+      
+      <h3>4. Eligibility & Representations</h3>
+      <p>You warrant that you are ≥18, understand leveraged Forex risks, have sufficient capital to bear losses, and your use complies with local laws. We reserve the right to refuse service at our discretion.</p>
+      
+      <h3>5. Account Registration & Security</h3>
+      <p>You are responsible for maintaining credential confidentiality and all activities under your account. Notify us immediately of unauthorised use.</p>
+      
+      <h3>6. Subscription Packages & Fees</h3>
+      <p>Access requires a subscription (TRIAL, SPARK, SURGE, MEGA). <span class="critical">ALL FEES ARE FINAL AND NON-REFUNDABLE</span> regardless of profitability or unused trades. Fees are processed via Flutterwave. We may change fees with 30 days' notice.</p>
+      
+      <h3>7. Prohibited Conduct</h3>
+      <p>You agree not to reverse-engineer, disable security, engage in fraud/money laundering, or access other users' data.</p>
+      
+      <h3>8. Technical Limitations & Third-Party Services</h3>
+      <p>We rely on MT5, Supabase, Flutterwave, and cloud infrastructure. We are not responsible for third-party uptime, accuracy, or failures. Internet/electronic delays are inherent.</p>
+      
+      <h3>9. DISCLAIMER OF WARRANTIES</h3>
+      <p>THE PLATFORM IS PROVIDED <strong>"AS IS" AND "AS AVAILABLE"</strong>. WE SPECIFICALLY DISCLAIM ALL IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, NON-INFRINGEMENT, ACCURACY, AND SECURITY. NO GUARANTEE OF PROFITABILITY OR UNINTERRUPTED SERVICE IS MADE.</p>
+      
+      <h3>10. LIMITATION OF LIABILITY</h3>
+      <p class="critical">TO THE MAXIMUM EXTENT PERMITTED BY LAW, VYLUX TECH INC. SHALL NOT BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING LOSS OF PROFITS OR TRADING LOSSES. OUR AGGREGATE LIABILITY SHALL NOT EXCEED THE TOTAL FEES PAID BY YOU IN THE SIX (6) MONTHS IMMEDIATELY PRECEDING THE CLAIM.</p>
+      
+      <h3>11. Indemnification</h3>
+      <p>You agree to indemnify and hold harmless VYLUX TECH INC. from any claims arising from your use, breach of terms, or negligence.</p>
+      
+      <h3>12. Governing Law & Dispute Resolution</h3>
+      <p class="critical">This Agreement is governed by the laws of the <strong>Republic of Uganda</strong>. Any dispute shall be resolved by binding arbitration in Kampala under the Uganda Arbitration Centre rules. <strong>YOU WAIVE THE RIGHT TO A JURY TRIAL AND CLASS ACTION.</strong></p>
+      
+      <h3>13. Termination</h3>
+      <p>You may terminate by deleting your account (no refunds). We may suspend/terminate for breach, fraud, or non-payment. Upon termination, remaining trades are forfeited.</p>
+      
+      <h3>14. Modifications</h3>
+      <p>We may amend terms by posting. Continued use constitutes acceptance. If you disagree, you must stop using the Platform.</p>
+      
+      <h3>15. Entire Agreement & Severability</h3>
+      <p>This Agreement, Privacy Policy, and Risk Disclosure constitute the entire agreement. If any provision is invalid, the remainder remains enforceable.</p>
+      
+      <h3>16. Survival</h3>
+      <p>Sections 1, 3, 9, 10, 11, 12, and indemnification clauses survive termination.</p>
+      
+      <h3>17. Contact</h3>
+      <p>Questions? Email: support@futuretraders.com | Whatsapp: +256704909060</p>
+    </div>
+
+    <!-- RISK DISCLOSURE -->
+    <div id="riskContent" class="legal-content hidden">
+      <span class="version-badge">Effective: May 07, 2026</span>
+      <h3>⚠️ IMPORTANT: READ CAREFULLY</h3>
+      <p>Trading foreign exchange on margin carries a <strong>HIGH LEVEL OF RISK</strong> and may not be suitable for all investors. Leverage can work against you. <span class="critical">YOU COULD SUSTAIN A TOTAL LOSS OF YOUR INITIAL CAPITAL.</span></p>
+      
+      <h3>1. High Risk of Loss</h3>
+      <p>You should not invest money you cannot afford to lose entirely. Past performance does not guarantee future results.</p>
+      
+      <h3>2. Automated Trading Software Risks</h3>
+      <p>The FUTURES bot is autonomous. Risks include: technical failures, connectivity issues, broker/MT5 limitations, market volatility, slippage, and news events. The bot mitigates but <strong>cannot eliminate</strong> these risks.</p>
+      
+      <h3>3. No Guarantee of Profit</h3>
+      <p>Historical performance is not indicative of future results. Markets are influenced by unpredictable factors. No assurance of target risk-reward ratios is made.</p>
+      
+      <h3>4. User Responsibility</h3>
+      <p>You are solely responsible for configuring parameters, monitoring balance, and disabling the bot when appropriate. The bot is a tool, not an advisor.</p>
+      
+      <h3>5. No Advisory or Fiduciary Duty</h3>
+      <p>VYLUX TECH INC. is not registered as an investment adviser. No fiduciary relationship exists. We have no duty to evaluate trade suitability.</p>
+      
+      <h3>6. Third-Party Services</h3>
+      <p>We rely on MT5, chart providers, Supabase, and Flutterwave. <strong>We are not responsible for losses resulting from third-party failure or misperformance.</strong></p>
+      
+      <h3>7. Leverage Risks</h3>
+      <p>Leverage magnifies gains and losses. A small adverse movement can quickly deplete your account. Risk settings do not limit total loss over multiple trades.</p>
+      
+      <h3>8. Force Majeure</h3>
+      <p>We are not liable for delays/failures due to acts of God, war, internet failures, power outages, or third-party interruptions.</p>
+      
+      <h3>9. No Refund Policy</h3>
+      <p class="critical">All subscription fees are non-refundable regardless of performance, technical difficulties, or other reasons. By purchasing, you accept full risk.</p>
+      
+      <h3>10. Acknowledgement</h3>
+      <p>I confirm I have read this disclosure, understand the high risks, accept sole responsibility for outcomes, and will not hold VYLUX TECH INC. liable for financial or technical losses.</p>
+    </div>
+
   </div>
 
   <script>
-    const html = document.documentElement;
-    const themeToggle = document.getElementById('themeToggle');
-    const iconSun = document.getElementById('iconSun');
-    const iconMoon = document.getElementById('iconMoon');
+    var tab = window.legalTab || 'terms';
+    var titleEl = document.getElementById('pageTitle');
+    var termsContent = document.getElementById('termsContent');
+    var riskContent = document.getElementById('riskContent');
 
-    themeToggle.addEventListener('click', () => {
-      const isDark = html.getAttribute('data-theme') === 'dark';
-      html.setAttribute('data-theme', isDark ? 'light' : 'dark');
-      iconSun.classList.toggle('hidden', !isDark);
-      iconMoon.classList.toggle('hidden', isDark);
-    });
+    if (tab === 'risk') {
+      titleEl.textContent = 'Risk Disclosure';
+      termsContent.classList.add('hidden');
+      riskContent.classList.remove('hidden');
+    } else {
+      titleEl.textContent = 'Terms & Conditions';
+      termsContent.classList.remove('hidden');
+      riskContent.classList.add('hidden');
+    }
 
     function goBack() {
       if (typeof window.showPage === 'function') {
