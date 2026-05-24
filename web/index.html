@@ -676,16 +676,22 @@
     }
 
     #page-forgot-password .back-btn {
-      background: none;
-      border: none;
+      background: var(--input-bg);
+      border: 1px solid var(--border);
       cursor: pointer;
       color: var(--text);
       display: flex;
       align-items: center;
-      gap: 0.25rem;
+      gap: 0.3rem;
       font-weight: 600;
-      font-size: 0.95rem;
+      font-size: 0.9rem;
       font-family: "Inter", sans-serif;
+      padding: 0.55rem 1rem;
+      border-radius: 10px;
+      transition: background 0.2s;
+    }
+    #page-forgot-password .back-btn:hover {
+      background: var(--border);
     }
 
     #page-forgot-password .page-title {
@@ -917,16 +923,22 @@
     }
 
     #page-verification .back-btn {
-      background: none;
-      border: none;
+      background: var(--input-bg);
+      border: 1px solid var(--border);
       cursor: pointer;
       color: var(--text);
       display: flex;
       align-items: center;
-      gap: 0.25rem;
+      gap: 0.3rem;
       font-weight: 600;
-      font-size: 0.95rem;
+      font-size: 0.9rem;
       font-family: "Inter", sans-serif;
+      padding: 0.55rem 1rem;
+      border-radius: 10px;
+      transition: background 0.2s;
+    }
+    #page-verification .back-btn:hover {
+      background: var(--border);
     }
 
     #page-verification .page-title {
