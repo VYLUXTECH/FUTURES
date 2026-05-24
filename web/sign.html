@@ -1,162 +1,163 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no" />
   <title>FUTURES – Login</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/dancing-script@5.0.18/index.css" />
   <link href="https://fonts.bunny.net/css?family=inter:400;500;600;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    :root {
-      --bg: #000000;
-      --surface: #0a0a0a;
-      --surface-hover: #111111;
-      --border: #1a1a1a;
-      --border-focus: #333333;
-      --text: #ffffff;
-      --text-muted: #888888;
-      --text-inverse: #000000;
-      --primary: #ffffff;
-      --primary-fg: #000000;
-      --input-bg: #050505;
-      --radius: 12px;
-      --transition: all 0.2s ease;
-      --shadow: 0 20px 50px rgba(0,0,0,0.5);
-    }
-    [data-theme="light"] {
-      --bg: #ffffff;
-      --surface: #f8f9fa;
-      --surface-hover: #e9ecef;
-      --border: #dee2e6;
-      --border-focus: #adb5bd;
-      --text: #111111;
-      --text-muted: #6c757d;
-      --text-inverse: #ffffff;
-      --primary: #000000;
-      --primary-fg: #ffffff;
-      --input-bg: #ffffff;
-      --shadow: 0 20px 50px rgba(0,0,0,0.08);
-    }
-    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       min-height: 100vh;
-      background: var(--bg);
-      color: var(--text);
+      background: #000;
+      color: #fff;
       font-family: 'Inter', sans-serif;
-      transition: background 0.3s ease, color 0.3s ease;
-    }
-    .app-container {
-      min-height: 100vh;
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 2rem 1rem;
-      position: relative;
+      padding: 1rem;
+      background: radial-gradient(ellipse at 50% 30%, rgba(255,255,255,0.04) 0%, transparent 70%);
     }
-    .auth-card {
+    .login-card {
       width: 100%;
-      max-width: 440px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 24px;
-      padding: 2rem;
-      box-shadow: var(--shadow);
-      transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+      max-width: 400px;
+      background: rgba(10, 10, 10, 0.8);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 28px;
+      padding: 2.5rem 2rem;
+      box-shadow: 0 25px 60px rgba(0,0,0,0.6);
+      animation: fadeUp 0.5s ease-out;
     }
-    .logo-section { text-align: center; margin-bottom: 1.5rem; }
-    .logo-title { font-family: 'Dancing Script', cursive; font-size: 3rem; font-weight: 700; margin-bottom: 0.25rem; }
-    .logo-motto { font-size: 0.8rem; letter-spacing: 0.15em; color: var(--text-muted); text-transform: uppercase; }
-    .form-group { margin-bottom: 1rem; }
-    .form-label { display: block; font-size: 0.8rem; font-weight: 500; color: var(--text-muted); margin-bottom: 0.4rem; }
-    .form-input {
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .logo {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    .logo h1 {
+      font-family: 'Dancing Script', cursive;
+      font-size: 3.2rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-shadow: 0 0 20px rgba(255,255,255,0.15);
+    }
+    .logo p {
+      font-size: 0.75rem;
+      letter-spacing: 0.2em;
+      color: #888;
+      text-transform: uppercase;
+      margin-top: 0.3rem;
+    }
+    .field { margin-bottom: 1.2rem; }
+    .field label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: #999;
+      margin-bottom: 0.4rem;
+    }
+    .field input {
       width: 100%;
-      padding: 0.85rem 1rem;
-      background: var(--input-bg);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      color: var(--text);
+      padding: 0.9rem 1rem;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      color: #fff;
       font-family: 'Inter', sans-serif;
       font-size: 0.95rem;
-      transition: var(--transition);
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
-    .form-input:focus { outline: none; border-color: var(--border-focus); box-shadow: 0 0 0 2px rgba(128,128,128,0.1); }
-    .form-input::placeholder { color: var(--text-muted); opacity: 0.6; }
-    .btn-primary {
-      width: 100%; padding: 1rem; background: var(--primary); color: var(--primary-fg);
-      border: none; border-radius: var(--radius); font-family: 'Inter', sans-serif;
-      font-weight: 700; font-size: 1rem; cursor: pointer; transition: var(--transition);
-      display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-bottom: 0.75rem;
+    .field input:focus {
+      outline: none;
+      border-color: rgba(255,255,255,0.25);
+      box-shadow: 0 0 0 3px rgba(255,255,255,0.04);
     }
-    .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 5px 15px rgba(128,128,128,0.2); }
-    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-    .forgot-row {
-      display: flex;
-      justify-content: flex-end;
-      margin-top: -0.25rem;
-      margin-bottom: 1rem;
+    .field input::placeholder { color: #555; }
+    .forgot {
+      text-align: right;
+      margin-top: -0.6rem;
+      margin-bottom: 1.2rem;
     }
-    .forgot-link {
-      font-size: 0.8rem;
-      color: var(--text-muted);
+    .forgot a {
+      font-size: 0.78rem;
+      color: #666;
       text-decoration: none;
       transition: color 0.2s;
     }
-    .forgot-link:hover { color: var(--text); }
-    .form-footer {
-      text-align: center;
-      font-size: 0.9rem;
-      color: var(--text-muted);
-      border-top: 1px solid var(--border);
-      padding-top: 1.5rem;
-    }
-    .form-footer a {
-      color: var(--text);
-      font-weight: 600;
-      cursor: pointer;
-      text-decoration: none;
-    }
-    .form-footer a:hover { text-decoration: underline; }
-    .error-text {
+    .forgot a:hover { color: #bbb; }
+    .error {
       color: #ff4444;
-      font-size: 0.85rem;
+      font-size: 0.82rem;
       text-align: center;
-      margin-bottom: 0.75rem;
+      margin-bottom: 0.8rem;
       min-height: 1.2em;
     }
+    .btn-login {
+      width: 100%;
+      padding: 0.95rem;
+      background: #fff;
+      color: #000;
+      border: none;
+      border-radius: 14px;
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.15s;
+    }
+    .btn-login:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-login:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+    .footer {
+      text-align: center;
+      margin-top: 1.8rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      font-size: 0.88rem;
+      color: #666;
+    }
+    .footer a {
+      color: #fff;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .footer a:hover { text-decoration: underline; }
     @media (max-width: 480px) {
-      .auth-card { padding: 1.5rem; }
-      .logo-title { font-size: 2.5rem; }
+      .login-card { padding: 2rem 1.5rem; }
+      .logo h1 { font-size: 2.6rem; }
     }
   </style>
 </head>
 <body>
-  <div class="app-container">
-    <div class="auth-card">
-      <div class="logo-section">
-        <h1 class="logo-title">FUTURES</h1>
-        <p class="logo-motto">Price is the only Indicator</p>
-      </div>
-
-      <form id="loginForm">
-        <div class="form-group">
-          <label class="form-label">Email Address</label>
-          <input type="email" class="form-input" id="loginEmail" placeholder="trader@example.com" required />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Password</label>
-          <input type="password" class="form-input" id="loginPassword" placeholder="••••••••" required minlength="6" />
-        </div>
-        <div class="forgot-row">
-          <a class="forgot-link" href="forgot_password.html">Forgot password?</a>
-        </div>
-        <p class="error-text" id="loginError"></p>
-        <button type="submit" class="btn-primary" id="loginBtn">Login</button>
-        <div class="form-footer">
-          Don't have an account? <a href="signup.html">Create new account</a>
-        </div>
-      </form>
+  <div class="login-card">
+    <div class="logo">
+      <h1>FUTURES</h1>
+      <p>Price is the only Indicator</p>
     </div>
+
+    <form id="loginForm">
+      <div class="field">
+        <label>Email Address</label>
+        <input type="email" id="loginEmail" placeholder="trader@example.com" required />
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="loginPassword" placeholder="••••••••" required minlength="6" />
+      </div>
+      <div class="forgot">
+        <a href="forgot_password.html">Forgot password?</a>
+      </div>
+      <p class="error" id="loginError"></p>
+      <button type="submit" class="btn-login" id="loginBtn">Login</button>
+      <div class="footer">
+        Don't have an account? <a href="signup.html">Create new account</a>
+      </div>
+    </form>
   </div>
 
   <script>
@@ -201,20 +202,6 @@
     });
 
     initSupabase();
-
-    const themeToggle = document.createElement('button');
-    themeToggle.className = 'theme-toggle';
-    themeToggle.style.cssText = 'position:absolute;top:1.5rem;right:1.5rem;background:var(--surface);border:1px solid var(--border);border-radius:50%;width:44px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text);z-index:10;';
-    themeToggle.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>';
-    document.querySelector('.app-container').prepend(themeToggle);
-    themeToggle.addEventListener('click', () => {
-      const html = document.documentElement;
-      const isDark = html.getAttribute('data-theme') === 'dark';
-      html.setAttribute('data-theme', isDark ? 'light' : 'dark');
-      themeToggle.innerHTML = isDark
-        ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>'
-        : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>';
-    });
   </script>
 </body>
 </html>
