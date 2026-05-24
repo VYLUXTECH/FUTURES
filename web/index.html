@@ -104,6 +104,10 @@
     .page-section {
       display: none;
     }
+    .page-section.active {
+      display: block;
+      min-height: 100vh;
+    }
 
     .hidden {
       display: none !important;
@@ -1878,12 +1882,11 @@
          ============================================================ */
       window.showPage = function (pageId) {
         document.querySelectorAll('.page-section').forEach(function (p) {
-          p.style.display = 'none';
+          p.classList.remove('active');
         });
         var section = document.getElementById(pageId);
         if (section) {
-          section.style.display = '';
-          // Call page init if available and not yet initialized
+          section.classList.add('active');
           if (!pageInitFlags[pageId]) {
             pageInitFlags[pageId] = true;
             var initMap = {
@@ -1904,7 +1907,7 @@
          ============================================================ */
       window.loadPage = async function (pageId, htmlFile) {
         document.querySelectorAll('.page-section').forEach(function (p) {
-          p.style.display = 'none';
+          p.classList.remove('active');
         });
         var section = document.getElementById(pageId);
         if (!section) {
@@ -1940,7 +1943,7 @@
             return;
           }
         }
-        section.style.display = '';
+        section.classList.add('active');
         updateThemeIcons();
       };
 
