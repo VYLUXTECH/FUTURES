@@ -2098,11 +2098,13 @@
         function startAnimation() {
           if (hasAnimated) return;
           hasAnimated = true;
-          animateLetters();
-          setTimeout(triggerDecorations, 500);
-          setTimeout(revealMotto, 900);
-          setTimeout(startBreathing, 1000);
-          showTapHint();
+          requestAnimationFrame(function () {
+            animateLetters();
+            setTimeout(triggerDecorations, 500);
+            setTimeout(revealMotto, 900);
+            setTimeout(startBreathing, 1000);
+            showTapHint();
+          });
         }
 
         function handleTap() {
