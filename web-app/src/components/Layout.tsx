@@ -11,6 +11,7 @@ const NAV_ITEMS: { label: string; page: Page }[] = [
   { label: 'Dashboard', page: 'dashboard' },
   { label: 'Copilot', page: 'copilot' },
   { label: 'Trades', page: 'accountability' },
+  { label: 'MT5', page: 'mt5' },
   { label: 'Settings', page: 'settings' },
   { label: 'Support', page: 'support' },
 ];
