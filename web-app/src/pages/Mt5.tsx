@@ -140,13 +140,12 @@ export default function Mt5(_props: Props) {
       )}
 
       <details className="card">
-        <summary>ℹ️ How MT5 Connection Works</summary>
+        <summary>ℹ️ How It Works</summary>
         <ol>
-          <li>MT5 is installed on the server where the bot runs.</li>
-          <li>Once you enter your credentials here, the bot reads them from the database, decrypts them, and auto-connects via <strong>mt5.initialize()</strong>.</li>
-          <li>If MT5 isn't running, the bot launches it automatically from <strong>terminal64.exe</strong>.</li>
-          <li>On the server, make sure <strong>Allow Algorithmic Trading</strong> is enabled in <strong>Tools → Options → Expert Advisors</strong>.</li>
-          <li>The bot reconnects on each restart — no need to re-enter credentials.</li>
+          <li>Enter your MT5 login, password, and server below.</li>
+          <li>Your password is encrypted before storage — never stored in plaintext.</li>
+          <li>The bot decrypts and uses your credentials to connect automatically.</li>
+          <li>Credentials are saved — no need to re-enter on restart.</li>
         </ol>
       </details>
     </div>
