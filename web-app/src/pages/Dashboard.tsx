@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchStatus, fetchDashboard, startBot, stopBot } from '../services/api';
 import type { NavigateFn } from '../App';
 
-type Mode = 'long' | 'short' | 'both';
+type Mode = 'long' | 'short';
 
 interface Props { navigate: NavigateFn; }
 
@@ -117,9 +117,9 @@ export default function Dashboard({ navigate }: Props) {
           <button className="btn-control btn-stop" onClick={handleStop} disabled={!botActive}>⏹ STOP BOT</button>
         </div>
         <div className="mode-selector">
-          {(['long', 'short', 'both'] as Mode[]).map((m) => (
+          {(['long', 'short'] as Mode[]).map((m) => (
             <button key={m} className={`mode-btn ${mode === m ? 'active' : ''}`} onClick={() => setMode(m)} disabled={botActive}>
-              {m === 'long' ? 'Long-term' : m === 'short' ? 'Short-term' : 'Both'}
+              {m === 'long' ? 'Long-term' : 'Short-term'}
             </button>
           ))}
         </div>
@@ -131,7 +131,7 @@ export default function Dashboard({ navigate }: Props) {
               disabled={botActive} style={{ width: 60, padding: '0.4rem', background: 'var(--bg)', border: '1px solid var(--card-border)', borderRadius: 6, color: 'var(--text)', textAlign: 'center', fontFamily: 'Inter, sans-serif' }} />
           </div>
         )}
-        {mode === 'short' && (
+        {mode !== 'long' && (
           <p style={{ background: 'var(--bg)', border: '1px solid var(--card-border)', borderRadius: 10, padding: '0.75rem', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
             One trade will be executed, then bot stops. Adjust risk as needed.
           </p>
