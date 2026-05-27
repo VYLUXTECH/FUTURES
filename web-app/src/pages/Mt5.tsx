@@ -140,13 +140,13 @@ export default function Mt5(_props: Props) {
       )}
 
       <details className="card">
-        <summary>⚠ Automated Trading Must Be Enabled</summary>
+        <summary>ℹ️ How MT5 Connection Works</summary>
         <ol>
-          <li>Open <strong>MetaTrader 5</strong>.</li>
-          <li>Go to <strong>Tools → Options → Expert Advisors</strong>.</li>
-          <li>Check: <strong>Allow Automated Trading</strong>.</li>
-          <li>Check: <strong>Allow WebRequest</strong> for listed URLs.</li>
-          <li>Click OK and reconnect.</li>
+          <li>MT5 is installed on the server where the bot runs.</li>
+          <li>Once you enter your credentials here, the bot reads them from the database, decrypts them, and auto-connects via <strong>mt5.initialize()</strong>.</li>
+          <li>If MT5 isn't running, the bot launches it automatically from <strong>terminal64.exe</strong>.</li>
+          <li>On the server, make sure <strong>Allow Algorithmic Trading</strong> is enabled in <strong>Tools → Options → Expert Advisors</strong>.</li>
+          <li>The bot reconnects on each restart — no need to re-enter credentials.</li>
         </ol>
       </details>
     </div>
