@@ -156,3 +156,56 @@ export async function saveSettings(updates: Record<string, unknown>): Promise<bo
     return res?.ok ?? false;
   } catch { return false; }
 }
+
+// ─── Copilot ──────────────────────────────────────────────
+export async function copilotChat(message: string): Promise<{ reply: string; finish_reason?: string | null; confirmation_id?: string } | null> {
+  try {
+    const token = await getAuthToken();
+    if (!token) return null;
+    const res = await fetch('/api/copilot/chat', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message }),
+    });
+    if (!res.ok) {
+      if (res.status === 429) return { reply: '⏳ You are being rate limited. Please wait a moment before sending another message.', finish_reason: null };
+      if (res.status === 503) return { reply: 'Copilot is not available right now. Please try again later.', finish_reason: null };
+      return { reply: 'An error occurred. Please try again.', finish_reason: null };
+    }
+    return res.json();
+  } catch { return { reply: 'Network error. Please check your connection.', finish_reason: null }; }
+}
+
+export async function copilotConfirm(confirmationId: string): Promise<{ reply: string } | null> {
+  try {
+    const token = await getAuthToken();
+    if (!token) return null;
+    const res = await fetch('/api/copilot/confirm', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirmation_id: confirmationId }),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch { return null; }
+}
+
+export async function copilotClear(): Promise<boolean> {
+  try {
+    const token = await getAuthToken();
+    if (!token) return false;
+    const res = await fetch('/api/copilot/clear', { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+    return res.ok;
+  } catch { return false; }
+}
+
+export async function copilotHealth(): Promise<string | null> {
+  try {
+    const token = await getAuthToken();
+    if (!token) return null;
+    const res = await fetch('/api/copilot/health', { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return null;
+    const d = await res.json() as { status: string };
+    return d.status;
+  } catch { return null; }
+}
