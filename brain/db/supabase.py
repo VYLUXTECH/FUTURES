@@ -115,48 +115,80 @@ def sync_trade(
 
 # ── Trade Reads ─────────────────────────────────────────────
 
-def get_recent_trades(limit: int = 50, uri: str | None = None) -> list[dict]:
-    rows = _exec_query(
-        "SELECT * FROM trades ORDER BY opened_at DESC LIMIT %s",
-        (limit,), uri=uri, fetch=True,
-    )
+def get_recent_trades(limit: int = 50, uri: str | None = None, user_id: str | None = None) -> list[dict]:
+    if user_id:
+        rows = _exec_query(
+            "SELECT * FROM trades WHERE user_id = %s ORDER BY opened_at DESC LIMIT %s",
+            (user_id, limit), uri=uri, fetch=True,
+        )
+    else:
+        rows = _exec_query(
+            "SELECT * FROM trades ORDER BY opened_at DESC LIMIT %s",
+            (limit,), uri=uri, fetch=True,
+        )
     return rows or []
 
 
-def get_open_trades(uri: str | None = None) -> list[dict]:
-    rows = _exec_query(
-        "SELECT * FROM trades WHERE status='OPEN' ORDER BY opened_at DESC",
-        uri=uri, fetch=True,
-    )
+def get_open_trades(uri: str | None = None, user_id: str | None = None) -> list[dict]:
+    if user_id:
+        rows = _exec_query(
+            "SELECT * FROM trades WHERE user_id = %s AND status='OPEN' ORDER BY opened_at DESC",
+            (user_id,), uri=uri, fetch=True,
+        )
+    else:
+        rows = _exec_query(
+            "SELECT * FROM trades WHERE status='OPEN' ORDER BY opened_at DESC",
+            uri=uri, fetch=True,
+        )
     return rows or []
 
 
-def count_trades_today(uri: str | None = None) -> int:
+def count_trades_today(uri: str | None = None, user_id: str | None = None) -> int:
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    rows = _exec_query(
-        "SELECT COUNT(*) AS cnt FROM trades WHERE opened_at::date = %s",
-        (today,), uri=uri, fetch=True,
-    )
+    if user_id:
+        rows = _exec_query(
+            "SELECT COUNT(*) AS cnt FROM trades WHERE user_id = %s AND opened_at::date = %s",
+            (user_id, today), uri=uri, fetch=True,
+        )
+    else:
+        rows = _exec_query(
+            "SELECT COUNT(*) AS cnt FROM trades WHERE opened_at::date = %s",
+            (today,), uri=uri, fetch=True,
+        )
     return rows[0]["cnt"] if rows else 0
 
 
-def count_losses_last_24h(uri: str | None = None) -> int:
+def count_losses_last_24h(uri: str | None = None, user_id: str | None = None) -> int:
     cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
-    rows = _exec_query(
-        """SELECT COUNT(*) AS cnt FROM trades
-           WHERE status='CLOSED' AND pnl < 0 AND closed_at >= %s""",
-        (cutoff,), uri=uri, fetch=True,
-    )
+    if user_id:
+        rows = _exec_query(
+            """SELECT COUNT(*) AS cnt FROM trades
+               WHERE user_id = %s AND status='CLOSED' AND pnl < 0 AND closed_at >= %s""",
+            (user_id, cutoff), uri=uri, fetch=True,
+        )
+    else:
+        rows = _exec_query(
+            """SELECT COUNT(*) AS cnt FROM trades
+               WHERE status='CLOSED' AND pnl < 0 AND closed_at >= %s""",
+            (cutoff,), uri=uri, fetch=True,
+        )
     return rows[0]["cnt"] if rows else 0
 
 
-def get_todays_pnl(uri: str | None = None) -> float:
+def get_todays_pnl(uri: str | None = None, user_id: str | None = None) -> float:
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    rows = _exec_query(
-        """SELECT COALESCE(SUM(pnl), 0) AS total FROM trades
-           WHERE status='CLOSED' AND closed_at::date = %s""",
-        (today,), uri=uri, fetch=True,
-    )
+    if user_id:
+        rows = _exec_query(
+            """SELECT COALESCE(SUM(pnl), 0) AS total FROM trades
+               WHERE user_id = %s AND status='CLOSED' AND closed_at::date = %s""",
+            (user_id, today), uri=uri, fetch=True,
+        )
+    else:
+        rows = _exec_query(
+            """SELECT COALESCE(SUM(pnl), 0) AS total FROM trades
+               WHERE status='CLOSED' AND closed_at::date = %s""",
+            (today,), uri=uri, fetch=True,
+        )
     return float(rows[0]["total"]) if rows else 0.0
 
 

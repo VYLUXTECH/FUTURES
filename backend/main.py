@@ -193,13 +193,31 @@ app.include_router(settings_router)
 set_bot_state_ref(_bot_state)
 set_settings_state_ref(_bot_state)
 
-# ── Serve web frontend ──────────────────────────────────
-WEB_DIR = Path(__file__).resolve().parent.parent / "web"
+# ── SPA static file handler (client-side routing fallback) ──
+class SPAStaticFiles(StaticFiles):
+    """Serves static files with SPA fallback — returns index.html for any
+    non-file path so that React Router handles client-side routing."""
 
-if WEB_DIR.exists():
-    app.mount("/", StaticFiles(directory=str(WEB_DIR), html=True), name="web")
+    async def get_response(self, path: str, scope):
+        try:
+            return await super().get_response(path, scope)
+        except Exception as e:
+            if getattr(e, "status_code", None) == 404:
+                return await super().get_response("index.html", scope)
+            raise
+
+# ── Serve web frontend ──────────────────────────────────
+_DIST = Path(__file__).resolve().parent.parent / "web-app" / "dist"
+_LEGACY = Path(__file__).resolve().parent.parent / "web"
+
+if _DIST.exists():
+    app.mount("/", SPAStaticFiles(directory=str(_DIST), html=True), name="web")
+    logger.info("Serving SPA from %s", _DIST)
+elif _LEGACY.exists():
+    app.mount("/", StaticFiles(directory=str(_LEGACY), html=True), name="web")
+    logger.info("Serving legacy web from %s", _LEGACY)
 else:
-    logger.warning("web/ directory not found at %s", WEB_DIR)
+    logger.warning("No frontend directory found (%s or %s)", _DIST, _LEGACY)
 
 
 # ── MT5 Init ─────────────────────────────────────────────
@@ -386,6 +404,7 @@ def trading_loop() -> None:
                     sl_price=signal["stop_loss"], tp_price=signal["take_profit"],
                     confidence=signal["confidence"], sectors=signal["sectors"],
                     supabase_uri=SUPABASE_DB_URI,
+                    user_id=_bot_state.get("active_user_id"),
                 )
                 if result:
                     logger.info("Trade executed | ticket=%s | %s %s | conf=%d%% | lots=%.2f",

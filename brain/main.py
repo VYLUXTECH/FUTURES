@@ -303,6 +303,7 @@ def trading_loop() -> None:
                     confidence=signal["confidence"],
                     sectors=signal["sectors"],
                     supabase_uri=SUPABASE_DB_URI,
+                    user_id=_bot_state.get("active_user_id"),
                 )
                 if result:
                     logger.info("Trade executed | ticket=%s | %s %s | conf=%d%% | lots=%.2f",

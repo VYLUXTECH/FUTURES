@@ -35,11 +35,13 @@ class SettingsUpdate(BaseModel):
 
 
 @router.get("/settings")
-async def get_settings(request: Request) -> dict:
+async def get_settings(request: Request, user: dict = Depends(require_auth)) -> dict:
     client = get_client()
     if not client:
         return _default_settings()
-    user_id = request.headers.get("x-user-id", "default")
+    user_id = user.get("sub")
+    if not user_id:
+        return _default_settings()
     try:
         res = client.table("profiles").select("*").eq("id", user_id).maybe_single().execute()
         if res.data:
@@ -86,7 +88,7 @@ def _default_settings() -> dict:
 
 
 @router.post("/settings")
-async def update_settings(req: SettingsUpdate, request: Request) -> dict:
+async def update_settings(req: SettingsUpdate, user: dict = Depends(require_auth)) -> dict:
     client = get_client()
     if not client:
         if _bot_state_ref is not None and req.risk_percent is not None:
@@ -95,7 +97,9 @@ async def update_settings(req: SettingsUpdate, request: Request) -> dict:
             _bot_state_ref["max_daily_trades"] = req.max_daily_trades
         return {"status": "updated", "note": "in-memory only (no supabase)"}
 
-    user_id = request.headers.get("x-user-id", "default")
+    user_id = user.get("sub")
+    if not user_id:
+        return {"status": "error", "note": "no user"}
     updates: dict[str, Any] = {}
     for field in ("risk_percent", "be_policy", "dry_run", "auto_compounding", "display_name", "notifications"):
         val = getattr(req, field, None)
@@ -135,12 +139,14 @@ class MT5CredentialsUpdate(BaseModel):
 
 
 @router.get("/mt5/credentials")
-async def get_mt5_credentials(request: Request) -> dict:
+async def get_mt5_credentials(user: dict = Depends(require_auth)) -> dict:
     """Return the user's saved MT5 credentials (no password)."""
     client = get_client()
     if not client:
         return {"error": "Supabase not configured"}
-    user_id = request.headers.get("x-user-id", "default")
+    user_id = user.get("sub")
+    if not user_id:
+        return {"login": None, "server": None, "connected": False}
     try:
         res = client.table("mt5_credentials").select("login, server, connected, automated_trading_enabled, last_error, last_connected_at").eq("user_id", user_id).maybe_single().execute()
         if res.data:
@@ -151,12 +157,14 @@ async def get_mt5_credentials(request: Request) -> dict:
 
 
 @router.post("/mt5/credentials")
-async def save_mt5_credentials(req: MT5CredentialsUpdate, request: Request) -> dict:
+async def save_mt5_credentials(req: MT5CredentialsUpdate, user: dict = Depends(require_auth)) -> dict:
     """Save full MT5 credentials (used by web signup page). Password is encrypted."""
     client = get_client()
     if not client:
         return {"error": "Supabase not configured"}
-    user_id = request.headers.get("x-user-id", "default")
+    user_id = user.get("sub")
+    if not user_id:
+        return {"error": "not authenticated"}
     if not req.login or not req.password:
         return {"error": "login and password required"}
     try:
@@ -167,7 +175,7 @@ async def save_mt5_credentials(req: MT5CredentialsUpdate, request: Request) -> d
             "password": encrypt_password(req.password),
             "server": req.server or "",
         }
-        client.table("mt5_credentials").upsert(data, on_conflict="user_id").execute()
+        client.table("mt5_credentials").upsert(data, on_conflict="user_id, login, server").execute()
         return {"status": "saved"}
     except Exception as e:
         logger.warning("Failed to save MT5 credentials: %s", e)
@@ -175,12 +183,14 @@ async def save_mt5_credentials(req: MT5CredentialsUpdate, request: Request) -> d
 
 
 @router.put("/mt5/credentials")
-async def update_mt5_credentials(req: MT5CredentialsUpdate, request: Request) -> dict:
+async def update_mt5_credentials(req: MT5CredentialsUpdate, user: dict = Depends(require_auth)) -> dict:
     """Update MT5 server selection and optionally test connection."""
     client = get_client()
     if not client:
         return {"error": "Supabase not configured"}
-    user_id = request.headers.get("x-user-id", "default")
+    user_id = user.get("sub")
+    if not user_id:
+        return {"error": "not authenticated"}
     updates: dict[str, Any] = {}
     if req.server is not None:
         updates["server"] = req.server
@@ -194,11 +204,12 @@ async def update_mt5_credentials(req: MT5CredentialsUpdate, request: Request) ->
 
 @router.get("/trades/export")
 async def export_trades(
-    request: Request,
     format: str = Query("csv", pattern="^(csv|pdf)$"),
     limit: int = Query(200, ge=1, le=10000),
+    user: dict = Depends(require_auth),
 ) -> StreamingResponse:
-    trades = get_recent_trades(limit=limit)
+    user_id = user.get("sub")
+    trades = get_recent_trades(limit=limit, user_id=user_id)
 
     if format == "pdf":
         from reportlab.lib.pagesizes import letter

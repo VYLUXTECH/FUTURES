@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.bunny.net; font-src 'self' https://fonts.bunny.net; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'self';" />
   <link rel="icon" type="image/jpeg" href="logo.jpg" />
   <title>FUTURES – Accountability</title>
   <link href="https://fonts.bunny.net/css?family=inter:400;500;600;700&display=swap" rel="stylesheet" />
@@ -260,37 +261,7 @@
   <div class="toast" id="toast"></div>
 
   <script>
-    /**
-     * AI AGENT NOTE: ACCOUNTABILITY SCREEN - PRODUCTION IMPLEMENTATION GUIDE
-     * -----------------------------------------------------------------------
-     * 1. DATA FETCHING & PAGINATION:
-     *    - Use Supabase query: `.from('trades').select('*').eq('user_id', userId)`
-     *    - Filter by date range: `.gte('closed_at', startDate)`
-     *    - Order: `.order('closed_at', { ascending: false })`
-     *    - Implement pagination (limit 50 per load) with "Load More" button or infinite scroll.
-     *    - The `dateRangeSelect` value (7, 30, 90, all) maps to specific date objects.
-     * 
-     * 2. OFFLINE CACHE:
-     *    - Use AsyncStorage (React Native) or IndexedDB (Web) to store fetched trades.
-     *    - Key: `trades_cache_${userId}`
-     *    - On load: Check network. If offline, load from cache immediately.
-     *    - If online: Fetch fresh data, update cache, update UI.
-     *    - Show "Offline – showing cached data" banner if no network.
-     * 
-     * 3. EXPORT LOGIC:
-     *    - CSV: Convert JSON array to CSV string. Use 'Blob' and 'URL.createObjectURL' to download.
-     *    - PDF: Use 'jspdf' + 'jspdf-autotable'. Generate a clean, printable table.
-     *    - For large exports (>500 rows), offload to a backend edge function to generate the file and return a signed URL.
-     * 
-     * 4. SECURITY:
-     *    - RLS Policy: `CREATE POLICY "Users view own trades" ON trades FOR SELECT USING (auth.uid() = user_id);`
-     *    - Never expose other users' trade data.
-     * 
-     * 5. UI STATES:
-     *    - Loading: Show skeleton rows or spinner in the table body.
-     *    - Empty: Show `#emptyState` div if array length is 0.
-     *    - Error: Show a toast with "Failed to load trades. Retry?"
-     */
+    /** @deprecated Stub implementation - replace with real Supabase queries */
 
     // Mock Data
     const MOCK_TRADES = [
@@ -339,18 +310,13 @@
 
     function handleFilterChange() {
       const range = document.getElementById('dateRangeSelect').value;
-      // AI AGENT NOTE: Filter currentTrades based on range.
-      // In production, trigger a new fetch with `gte('closed_at', calculateStartDate(range))`.
+      // @todo Filter based on range with actual API call
       showToast(`Filter applied: ${range} days`, 'success');
       renderTrades(currentTrades);
     }
 
     function handleExport(format) {
-      // AI AGENT NOTE: Implementation for export.
-      // CSV: Convert currentTrades to CSV string, create Blob, trigger download.
-      // PDF: Use jspdf-autotable to generate PDF from currentTrades.
-      // Backend approach: Call edge function `/api/export?format=${format}&range=${range}`.
-      
+      // @todo Implement real export via backend API
       showToast(`${format.toUpperCase()} export started...`, 'success');
       
       setTimeout(() => {

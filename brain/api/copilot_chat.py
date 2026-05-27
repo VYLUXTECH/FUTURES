@@ -564,10 +564,11 @@ async def execute_confirmation(confirmation_id: str, user_id: str, bot_state: di
             pair=symbol, direction="BUY", lots=round(lots, 2),
             entry_price=price, sl_price=sl_price, tp_price=tp_price,
             confidence=80, sectors=None, supabase_uri=SUPABASE_DB_URI,
+            user_id=user_id,
         )
         if result:
-            return {"reply": f"✅ Buy order placed: {round(lots, 2)} lots {symbol} at {price:.5f}. SL: {sl_price:.5f}, TP: {tp_price:.5f}."}
-        return {"reply": f"❌ Failed to place buy order for {symbol}."}
+            return {"reply": f"Buy order placed: {round(lots, 2)} lots {symbol} at {price:.5f}. SL: {sl_price:.5f}, TP: {tp_price:.5f}."}
+        return {"reply": f"Failed to place buy order for {symbol}."}
 
     elif tool == "place_sell":
         symbol = args.get("symbol")
@@ -589,10 +590,11 @@ async def execute_confirmation(confirmation_id: str, user_id: str, bot_state: di
             pair=symbol, direction="SELL", lots=round(lots, 2),
             entry_price=price, sl_price=sl_price, tp_price=tp_price,
             confidence=80, sectors=None, supabase_uri=SUPABASE_DB_URI,
+            user_id=user_id,
         )
         if result:
-            return {"reply": f"✅ Sell order placed: {round(lots, 2)} lots {symbol} at {price:.5f}. SL: {sl_price:.5f}, TP: {tp_price:.5f}."}
-        return {"reply": f"❌ Failed to place sell order for {symbol}."}
+            return {"reply": f"Sell order placed: {round(lots, 2)} lots {symbol} at {price:.5f}. SL: {sl_price:.5f}, TP: {tp_price:.5f}."}
+        return {"reply": f"Failed to place sell order for {symbol}."}
 
     elif tool == "close_all_positions":
         from core.executor import close_position
@@ -606,6 +608,7 @@ async def execute_confirmation(confirmation_id: str, user_id: str, bot_state: di
                         ticket=p.ticket, pair=p.symbol,
                         direction=direction, lots=p.volume,
                         supabase_uri=SUPABASE_DB_URI,
+                        user_id=user_id,
                     )
                     if ok:
                         closed += 1
@@ -624,6 +627,7 @@ async def execute_confirmation(confirmation_id: str, user_id: str, bot_state: di
                         ticket=p.ticket, pair=p.symbol,
                         direction=direction, lots=p.volume,
                         supabase_uri=SUPABASE_DB_URI,
+                        user_id=user_id,
                     )
                     if ok:
                         closed += 1

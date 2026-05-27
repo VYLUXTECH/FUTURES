@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.bunny.net; font-src 'self' https://fonts.bunny.net; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'self';" />
   <link rel="icon" type="image/jpeg" href="logo.jpg" />
   <title>FUTURES – Support</title>
   <link href="https://fonts.bunny.net/css?family=inter:400;500;600;700&display=swap" rel="stylesheet" />
@@ -316,30 +317,7 @@
   <div class="toast" id="toast"></div>
 
   <script>
-    /**
-     * AI AGENT NOTE: SUPPORT SCREEN - PRODUCTION IMPLEMENTATION GUIDE
-     * -----------------------------------------------------------------------
-     * 1. ISSUE SUBMISSION:
-     *    - Use Supabase Storage bucket 'support-screenshots' for image uploads.
-     *    - Call Edge Function 'submit-support-ticket' with:
-     *      { title, description, screenshot_url, user_id }
-     *    - Edge Function logic:
-     *      a. Validate input.
-     *      b. Insert into 'support_tickets' table (RLS enabled).
-     *      c. Send notification to Telegram Admin Bot (via Telegram API).
-     *      d. Return success.
-     * 
-     * 2. TELEGRAM INTEGRATION:
-     *    - Store Telegram Bot Token and Admin Chat ID in Supabase Secrets.
-     *    - Edge Function sends message: "🚨 New Ticket: {title} from User {user_id}"
-     * 
-     * 3. CONTACT LINKS:
-     *    - Email: Use `mailto:support@futuresbot.ug`
-     *    - Telegram: Use `tg://resolve?domain=FUTURES_Support` (fallback to https://t.me/FUTURES_Support)
-     * 
-     * 4. ACADEMY LINK:
-     *    - Open external URL: `https://futurestradersacademy.com` (or actual link) using `Linking.openURL` (React Native).
-     */
+    /** @deprecated Stub implementation - replace with real ticket API */
 
     // DOM References
     const html = document.documentElement;
@@ -407,7 +385,14 @@
     function handleFileSelect(input) {
       const nameSpan = document.getElementById('fileName');
       if (input.files && input.files.length > 0) {
-        nameSpan.textContent = input.files[0].name;
+        var file = input.files[0];
+        if (file.size > 5 * 1024 * 1024) {
+          showToast('File too large. Max 5MB.', 'error');
+          input.value = '';
+          nameSpan.textContent = '';
+          return;
+        }
+        nameSpan.textContent = file.name;
       } else {
         nameSpan.textContent = '';
       }
@@ -430,25 +415,7 @@
       submitBtn.innerHTML = '<span class="spinner"></span> Submitting...';
 
       try {
-        /**
-         * AI AGENT NOTE: ACTUAL SUBMISSION LOGIC
-         * ---------------------------------------
-         * 1. Upload File (if any) to Supabase Storage:
-         *    const { data: uploadData, error: uploadError } = await supabase.storage
-         *      .from('support-screenshots')
-         *      .upload(`issues/${userId}/${Date.now()}_${fileName}`, file);
-         * 
-         * 2. Call Edge Function:
-         *    const response = await fetch(SUPABASE_URL + '/functions/v1/submit-support-ticket', {
-         *      method: 'POST',
-         *      headers: { Authorization: `Bearer ${session.access_token}` },
-         *      body: JSON.stringify({
-         *        title,
-         *        description: desc,
-         *        screenshot_url: uploadData?.path || null
-         *      })
-         *    });
-         */
+        /** @todo Implement real submission via Edge Function */
 
         // Simulate Network Delay
         await new Promise(r => setTimeout(r, 1500));
@@ -469,18 +436,16 @@
     // Contact Handlers
     function handleContact(type) {
       if (type === 'email') {
-        // AI AGENT NOTE: Use Linking.openURL('mailto:support@futuresbot.ug');
         window.location.href = 'mailto:support@futuresbot.ug';
       } else if (type === 'telegram') {
-        // AI AGENT NOTE: Use Linking.openURL('tg://resolve?domain=FUTURES_Support');
-        // Fallback to web if app not installed
         window.location.href = 'https://t.me/FUTURES_Support';
+      } else if (type === 'whatsapp') {
+        window.location.href = 'https://wa.me/256704909060';
       }
     }
 
     function handleAcademy(e) {
       e.preventDefault();
-      // AI AGENT NOTE: Use Linking.openURL('https://your-academy-url.com');
       alert('Opening Future Traders Academy...');
     }
 
@@ -491,7 +456,7 @@
     }
 
     function goBack() {
-      // navigation.goBack();
+      // @todo Replace with proper back navigation when embedded
       window.history.back();
     }
 

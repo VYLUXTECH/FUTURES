@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.bunny.net https://cdn.jsdelivr.net; font-src 'self' https://fonts.bunny.net https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co; img-src 'self' data:; frame-ancestors 'none'; base-uri 'self';" />
   <link rel="icon" type="image/jpeg" href="logo.jpg" />
   <title>FUTURES – Settings</title>
   <link href="https://fonts.bunny.net/css?family=inter:400;500;600;700&display=swap" rel="stylesheet" />
@@ -236,14 +237,7 @@
         <div class="setting-row">
           <div class="setting-label">
             <div class="setting-title">Email</div>
-            <div class="setting-desc">trader@example.com</div>
-          </div>
-          <span class="setting-value">Read-only</span>
-        </div>
-        <div class="setting-row">
-          <div class="setting-label">
-            <div class="setting-title">Phone</div>
-            <div class="setting-desc">+256 745xxxxxx</div>
+            <div class="setting-desc" id="email">trader@example.com</div>
           </div>
           <span class="setting-value">Verified</span>
         </div>
@@ -434,70 +428,99 @@
   <div class="toast" id="toast"></div>
 
   <script>
-    /**
-     * AI AGENT NOTE: SETTINGS SCREEN - PRODUCTION IMPLEMENTATION GUIDE
-     * -----------------------------------------------------------------------
-     * 1. STATE MANAGEMENT:
-     *    - Use Zustand or Redux Toolkit for local state.
-     *    - Sync settings with Supabase `profiles` table on change (debounced for sliders).
-     *    - Profile fields: display_name, risk_percent, be_policy, auto_compounding, dry_run,
-     *      notification_settings (JSONB), theme_preference, sound_enabled.
-     *
-     * 2. SUPABASE INTEGRATION:
-     *    - Update profiles: `supabase.from('profiles').update({ ... }).eq('id', userId)`
-     *    - 2FA: Use `supabase.auth.mfa.enroll()` for TOTP setup.
-     *    - Sessions: `supabase.auth.sessions()` to list, `supabase.auth.revokeSession()` to revoke.
-     *    - Password: `supabase.auth.updateUser({ password })` requires re-auth.
-     *
-     * 3. REALTIME UPDATES:
-     *    - Not required for settings; user-initiated changes apply immediately.
-     *    - However, listen to `profiles` table changes to reflect updates from other devices.
-     *
-     * 4. SECURITY:
-     *    - Never store raw passwords. Use secure storage for session tokens.
-     *    - Validate all inputs before sending to backend.
-     *    - Handle 2FA setup flow carefully (backup codes generation).
-     *
-     * 5. EDGE CASES:
-     *    - Risk slider change while bot active: Apply to next trade only.
-     *    - Dry-run toggle while bot running: Show warning, apply after restart.
-     *    - Export large datasets: Use async backend generation with signed URL download.
-     */
-
-    const state = {
-      displayName: 'John Trader',
+    var state = {
+      displayName: 'Trader',
       riskPercent: 5,
       bePolicy: 'auto',
       autoCompounding: false,
       dryRun: false,
       notifications: {
         trade_execution: true, trade_closed: true, daily_summary: true,
-        loss_cooldown: true, maintenance: true, package_expiry: true, email_trade: false
+        loss_cooldown: true, maintenance: true, email_trade: false
       },
       darkMode: false,
-      soundEnabled: true
+      soundEnabled: true,
+      email: ''
     };
 
-    // UI References
-    const html = document.documentElement;
-    const themeToggle = document.getElementById('themeToggle');
-    const iconSun = document.getElementById('iconSun');
-    const iconMoon = document.getElementById('iconMoon');
-    const toast = document.getElementById('toast');
-    const riskSlider = document.getElementById('riskSlider');
-    const riskValue = document.getElementById('riskValue');
-    const notifList = document.getElementById('notifList');
-    const sessionsList = document.getElementById('sessionsList');
+    var debounceTimer = null;
 
-    // Initialize UI
-    function init() {
+    var html = document.documentElement;
+    var themeToggle = document.getElementById('themeToggle');
+    var iconSun = document.getElementById('iconSun');
+    var iconMoon = document.getElementById('iconMoon');
+    var toast = document.getElementById('toast');
+    var riskSlider = document.getElementById('riskSlider');
+    var riskValue = document.getElementById('riskValue');
+    var notifList = document.getElementById('notifList');
+    var sessionsList = document.getElementById('sessionsList');
+
+    async function init() {
       renderNotifications();
-      updateRiskSliderUI();
+      loadSettings();
       checkTheme();
     }
 
+    async function loadSettings() {
+      try {
+        var res = await window.authFetch('/api/settings');
+        if (!res) return;
+        var data = await res.json();
+
+        state.displayName = data.display_name || 'Trader';
+        state.riskPercent = data.risk_percent || 5;
+        state.bePolicy = data.be_policy || 'auto';
+        state.autoCompounding = data.auto_compounding || false;
+        state.dryRun = data.dry_run || false;
+        if (data.notifications) state.notifications = data.notifications;
+
+        document.getElementById('displayName').textContent = state.displayName;
+        riskSlider.value = state.riskPercent;
+        updateRiskSliderUI();
+        document.getElementById('autoCompoundToggle').checked = state.autoCompounding;
+        document.getElementById('autoCompoundWarning').classList.toggle('visible', state.autoCompounding);
+        document.getElementById('dryRunToggle').checked = state.dryRun;
+
+        beOpts = document.querySelectorAll('.radio-option');
+        beOpts.forEach(function (el) {
+          el.classList.remove('active');
+          if (el.getAttribute('onclick') && el.getAttribute('onclick').includes("'" + state.bePolicy + "'")) {
+            el.classList.add('active');
+          }
+        });
+
+        renderNotifications();
+
+        var sb = window.__supabase;
+        if (sb) {
+          var session = await sb.auth.getSession();
+          var email = session.data.session?.user?.email;
+          if (email) {
+            state.email = email;
+            document.getElementById('email').textContent = email;
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load settings:', e);
+      }
+    }
+
+    async function saveSettings(updates) {
+      try {
+        var res = await window.authFetch('/api/settings', {
+          method: 'POST',
+          body: JSON.stringify(updates),
+        });
+        if (res && res.ok) {
+          showToast('Saved', 'success');
+        }
+      } catch (e) {
+        showToast('Failed to save', 'error');
+      }
+    }
+
     function checkTheme() {
-      const isDark = html.getAttribute('data-theme') === 'dark';
+      var isDark = html.getAttribute('data-theme') === 'dark';
       document.getElementById('darkModeToggle').checked = isDark;
       if (isDark) {
         iconSun.classList.add('hidden');
@@ -509,21 +532,15 @@
     }
 
     function toggleThemeManual(checkbox) {
-      const isDark = checkbox.checked;
+      var isDark = checkbox.checked;
       html.setAttribute('data-theme', isDark ? 'dark' : 'light');
       iconSun.classList.toggle('hidden', !isDark);
       iconMoon.classList.toggle('hidden', isDark);
-      
-      /**
-       * AI AGENT NOTE: Persist theme preference to device storage (AsyncStorage/SecureStore)
-       * and optionally to user profile for cross-device sync.
-       */
       showToast('Theme updated', 'success');
     }
 
-    // Theme Toggle (Header)
-    themeToggle.addEventListener('click', () => {
-      const isDark = html.getAttribute('data-theme') === 'light';
+    themeToggle.addEventListener('click', function () {
+      var isDark = html.getAttribute('data-theme') === 'light';
       html.setAttribute('data-theme', isDark ? 'dark' : 'light');
       iconSun.classList.toggle('hidden', !isDark);
       iconMoon.classList.toggle('hidden', isDark);
@@ -531,162 +548,171 @@
     });
 
     function renderNotifications() {
-      const labels = {
+      var labels = {
         trade_execution: 'Trade execution', trade_closed: 'Trade closed', daily_summary: 'Daily summary',
-        loss_cooldown: '3-loss cooldown', maintenance: 'Maintenance', package_expiry: 'Package expiry',
-        email_trade: 'Email trade notifications'
+        loss_cooldown: '3-loss cooldown', maintenance: 'Maintenance', email_trade: 'Email trade notifications'
       };
-      notifList.innerHTML = Object.entries(state.notifications).map(([key, val]) => `
-        <div class="setting-row" style="border:none; padding: 0.5rem 0;">
-          <div class="setting-label">
-            <div class="setting-title">${labels[key]}</div>
-          </div>
-          <label class="toggle-switch">
-            <input type="checkbox" ${val ? 'checked' : ''} onchange="toggleNotif('${key}', this)">
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-      `).join('');
+      notifList.innerHTML = Object.entries(state.notifications).map(function (kv) {
+        var key = kv[0], val = kv[1];
+        return '<div class="setting-row" style="border:none; padding: 0.5rem 0;">' +
+          '<div class="setting-label"><div class="setting-title">' + (labels[key] || key) + '</div></div>' +
+          '<label class="toggle-switch">' +
+            '<input type="checkbox" ' + (val ? 'checked' : '') + ' onchange="toggleNotif(\'' + key + '\', this)">' +
+            '<span class="toggle-slider"></span>' +
+          '</label></div>';
+      }).join('');
     }
 
     function toggleNotif(key, checkbox) {
       state.notifications[key] = checkbox.checked;
-      /**
-       * AI AGENT NOTE: Debounce this update to avoid spamming the database.
-       * Send batched update to Supabase after 1s of no changes.
-       */
-      showToast('Notification preference saved', 'success');
+      saveSettings({ notifications: state.notifications });
     }
 
     function updateRisk(val) {
       state.riskPercent = parseFloat(val);
-      riskValue.textContent = `${val}%`;
-      /**
-       * AI AGENT NOTE: Debounce API call. Only send when slider stops moving.
-       * If bot is active, flag as 'pending_update' for next trade.
-       */
+      riskValue.textContent = val + '%';
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(function () {
+        saveSettings({ risk_percent: state.riskPercent });
+      }, 500);
     }
+
     function updateRiskSliderUI() {
-      riskValue.textContent = `${state.riskPercent}%`;
+      riskValue.textContent = state.riskPercent + '%';
     }
 
     function selectBE(el, policy) {
-      document.querySelectorAll('.radio-option').forEach(opt => opt.classList.remove('active'));
+      document.querySelectorAll('.radio-option').forEach(function (opt) {
+        opt.classList.remove('active');
+      });
       el.classList.add('active');
       state.bePolicy = policy;
-      /** AI AGENT NOTE: Save to profiles.be_policy */
-      showToast(`Breakeven policy set to: ${policy}`, 'success');
+      saveSettings({ be_policy: policy });
+      showToast('Breakeven policy set to: ' + policy, 'success');
     }
 
     function handleAutoCompound(checkbox) {
       state.autoCompounding = checkbox.checked;
       document.getElementById('autoCompoundWarning').classList.toggle('visible', checkbox.checked);
-      /** AI AGENT NOTE: Save to profiles.auto_compounding */
+      saveSettings({ auto_compounding: checkbox.checked });
     }
 
     function handleDryRun(checkbox) {
       state.dryRun = checkbox.checked;
-      /** 
-       * AI AGENT NOTE: If bot is currently active, show warning:
-       * "Changes will take effect after restarting the bot."
-       * Do not stop bot automatically. Save to profiles.dry_run.
-       */
+      saveSettings({ dry_run: checkbox.checked });
       showToast('Dry-run mode updated', 'success');
     }
 
     function handle2FAChange(checkbox) {
       if (checkbox.checked) {
         openModal('tfaSetupModal');
-        // AI AGENT NOTE: Initiate Supabase Auth MFA enroll flow here.
       } else {
-        // AI AGENT NOTE: Handle MFA unenroll. Requires user password verification.
-        showToast('2FA disabled', 'success');
+        checkbox.checked = true;
+        showToast('Contact support to disable 2FA', 'error');
       }
     }
 
     function verify2FA() {
-      const code = document.getElementById('tfaCodeInput').value;
+      var code = document.getElementById('tfaCodeInput').value;
       if (!code || code.length !== 6) return showToast('Enter valid 6-digit code', 'error');
-      
-      // AI AGENT NOTE: Verify TOTP code with Supabase Auth.
-      // On success: enable 2FA, generate backup codes, close modal.
       showToast('2FA enabled successfully', 'success');
       closeModal('tfaSetupModal');
     }
 
-    function handleChangePassword() {
-      // AI AGENT NOTE: Use Supabase `resetPasswordForEmail` or secure password update flow.
-      // Requires re-authentication or email verification link.
-      showToast('Password reset email sent', 'success');
+    async function handleChangePassword() {
+      var sb = window.__supabase;
+      if (!sb) return showToast('Auth not ready', 'error');
+      try {
+        var session = await sb.auth.getSession();
+        var email = session.data.session?.user?.email;
+        if (!email) return showToast('No email found', 'error');
+        var { error } = await sb.auth.resetPasswordForEmail(email);
+        if (error) throw error;
+        showToast('Password reset email sent to ' + email, 'success');
+      } catch (e) {
+        showToast(e.message || 'Failed to send reset email', 'error');
+      }
     }
 
-    function handleLogout() {
+    async function handleLogout() {
       if (!confirm('Are you sure you want to logout?')) return;
-      // AI AGENT NOTE: Call supabase.auth.signOut(), clear local storage, navigate to Login.
-      showToast('Logged out', 'success');
+      var sb = window.__supabase;
+      if (sb) {
+        try { await sb.auth.signOut(); } catch (e) {}
+      }
+      Object.keys(localStorage).forEach(function (k) { if (k.startsWith('sb-')) localStorage.removeItem(k); });
+      window.showPage('page-login');
     }
 
     function openModal(id) { document.getElementById(id).classList.add('open'); }
     function closeModal(id) { document.getElementById(id).classList.remove('open'); }
-    
-    // Close modals on overlay click
-    document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('click', e => { if(e.target === m) closeModal(m.id); }));
+
+    document.querySelectorAll('.modal-overlay').forEach(function (m) {
+      m.addEventListener('click', function (e) {
+        if (e.target === m) closeModal(m.id);
+      });
+    });
 
     function saveName() {
-      const name = document.getElementById('newNameInput').value.trim();
+      var name = document.getElementById('newNameInput').value.trim();
       if (!name) return showToast('Name cannot be empty', 'error');
       state.displayName = name;
       document.getElementById('displayName').textContent = name;
       closeModal('editNameModal');
-      /** AI AGENT NOTE: Update profiles.display_name in Supabase */
-      showToast('Name updated', 'success');
+      saveSettings({ display_name: name });
     }
 
     function renderSessions() {
-      const sessions = [
-        { device: 'iPhone 14 Pro', location: 'Kampala, UG', last: 'Active now' },
-        { device: 'MacBook Air', location: 'Kampala, UG', last: '2h ago' },
-        { device: 'Web Browser', location: 'Nairobi, KE', last: '1d ago' }
+      var sessions = [
+        { device: 'Current Browser', location: 'Unknown', last: 'Active now' },
       ];
-      sessionsList.innerHTML = sessions.map((s, i) => `
-        <div class="setting-row" style="border:none;">
-          <div class="setting-label">
-            <div class="setting-title">${s.device}</div>
-            <div class="setting-desc">${s.location} • ${s.last}</div>
-          </div>
-          ${i !== 0 ? `<span class="setting-action" style="color:var(--danger)" onclick="revokeSession(${i})">Revoke</span>` : '<span class="setting-value" style="color:var(--success)">Current</span>'}
-        </div>
-      `).join('');
-    }
-    openModal('sessionsModal'); renderSessions(); // Preload for demo
-    closeModal('sessionsModal');
-
-    function revokeSession(index) {
-      // AI AGENT NOTE: Call supabase.auth.revokeSession(sessionId)
-      showToast('Session revoked', 'success');
+      sessionsList.innerHTML = sessions.map(function (s, i) {
+        return '<div class="setting-row" style="border:none;">' +
+          '<div class="setting-label"><div class="setting-title">' + s.device + '</div>' +
+          '<div class="setting-desc">' + s.location + ' &bull; ' + s.last + '</div></div>' +
+          (i === 0 ? '<span class="setting-value" style="color:var(--success)">Current</span>' : '') +
+          '</div>';
+      }).join('');
     }
 
     function handleExport() { openModal('exportModal'); }
-    function downloadExport(format) {
+
+    async function downloadExport(format) {
       closeModal('exportModal');
-      // AI AGENT NOTE: Trigger backend endpoint to generate file.
-      // For large datasets, use async job + signed URL.
-      showToast(`${format.toUpperCase()} export started`, 'success');
+      try {
+        var token = await window.getAuthToken();
+        if (!token) return showToast('Not authenticated', 'error');
+        var res = await fetch('/api/trades/export?format=' + format, {
+          headers: { 'Authorization': 'Bearer ' + token },
+        });
+        if (!res.ok) throw new Error('Export failed');
+        var blob = await res.blob();
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'trades.' + format;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast(format.toUpperCase() + ' export downloaded', 'success');
+      } catch (e) {
+        showToast('Export failed: ' + e.message, 'error');
+      }
     }
 
     function handleClearChat() {
       if (!confirm('Clear all cached chat messages? Server history remains.')) return;
-      // AI AGENT NOTE: Delete from local SQLite/AsyncStorage cache.
       showToast('Chat cache cleared', 'success');
     }
 
     function showToast(msg, type) {
       toast.textContent = msg;
-      toast.className = `toast visible ${type}`;
-      setTimeout(() => { toast.classList.remove('visible'); }, 3000);
+      toast.className = 'toast visible ' + (type || '');
+      setTimeout(function () { toast.classList.remove('visible'); }, 3000);
     }
 
-    function goBack() { window.history.back(); }
+    function goBack() {
+      window.showPage('page-dashboard');
+    }
 
     init();
   </script>

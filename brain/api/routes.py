@@ -53,6 +53,7 @@ class BotStatusResponse(BaseModel):
     running: bool
     connected: bool
     mt5_connected: bool
+    mt5_configured: bool = False
     account_balance: float
     equity: float
     daily_trades: int
@@ -113,16 +114,39 @@ async def bot_status(user: dict = Depends(require_auth)) -> BotStatusResponse:
     risk = _bot_state.get("risk")
     cooldown = bool(risk and risk.in_cooldown) if risk else False
 
-    daily_trades = count_trades_today()
-    daily_pnl    = get_todays_pnl()
+    user_id = user.get("sub")
+    daily_trades = count_trades_today(user_id=user_id)
+    daily_pnl    = get_todays_pnl(user_id=user_id)
 
     hour_utc = datetime.now(timezone.utc).hour
     session_active = SESSION_START_UTC <= hour_utc < SESSION_END_UTC
+
+    mt5_configured = False
+    if user_id:
+        try:
+            import os
+            from config.settings import SUPABASE_DB_URI
+            uri = SUPABASE_DB_URI or os.getenv("SUPABASE_DB_URI")
+            if uri:
+                from brain.db.supabase import _get_conn
+                conn = _get_conn(uri)
+                with conn, conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT EXISTS(SELECT 1 FROM mt5_credentials WHERE user_id = %s AND connected = TRUE)",
+                        (user_id,),
+                    )
+                    row = cur.fetchone()
+                    if row and row[0]:
+                        mt5_configured = True
+                conn.close()
+        except Exception as exc:
+            logger.warning("Failed to check MT5 credentials: %s", exc)
 
     return BotStatusResponse(
         running=bool(_bot_state.get("running")),
         connected=connected,
         mt5_connected=connected,
+        mt5_configured=mt5_configured,
         account_balance=balance,
         equity=equity,
         daily_trades=daily_trades,
@@ -139,9 +163,10 @@ async def bot_status(user: dict = Depends(require_auth)) -> BotStatusResponse:
 @router.get("/api/dashboard")
 async def dashboard(user: dict = Depends(require_auth)) -> dict:
     """Aggregate data for the dashboard page."""
-    open_trades = get_open_trades()
-    recent_trades = get_recent_trades(limit=10)
-    daily_pnl = get_todays_pnl()
+    user_id = user.get("sub")
+    open_trades = get_open_trades(user_id=user_id)
+    recent_trades = get_recent_trades(limit=10, user_id=user_id)
+    daily_pnl = get_todays_pnl(user_id=user_id)
 
     loop = asyncio.get_event_loop()
     account = await loop.run_in_executor(None, mt5.account_info)
@@ -164,7 +189,8 @@ async def dashboard(user: dict = Depends(require_auth)) -> dict:
 @router.get("/api/trades")
 async def get_trades(limit: int = 50, user: dict = Depends(require_auth)) -> dict:
     """Trade history for accountability page."""
-    trades = get_recent_trades(limit=min(limit, 200))
+    user_id = user.get("sub")
+    trades = get_recent_trades(limit=min(limit, 200), user_id=user_id)
     return {"trades": trades, "count": len(trades)}
 
 
@@ -239,8 +265,9 @@ async def start_bot(req: StartBotRequest | None = None, request: Request = None,
     if start_fn and _bot_state.get("trading_thread") is None:
         start_fn()
 
+    _bot_state["active_user_id"] = user.get("sub")
     _bot_state["running"] = True
-    logger.info("Bot start requested via API | risk_percent=%s", _bot_state.get("risk_percent"))
+    logger.info("Bot start requested via API | user=%s | risk_percent=%s", user.get("sub"), _bot_state.get("risk_percent"))
     return {"status": "started"}
 
 
@@ -248,6 +275,7 @@ async def start_bot(req: StartBotRequest | None = None, request: Request = None,
 async def stop_bot(user: dict = Depends(require_auth)) -> dict:
     """Gracefully halt the trading loop."""
     _bot_state["running"] = False
+    _bot_state.pop("active_user_id", None)
     logger.info("Bot stop requested via API")
     return {"status": "stopped"}
 
@@ -503,44 +531,9 @@ async def mt5_info(user: dict = Depends(require_auth)) -> dict:
     }
 
 
-# ── MT5 Credentials (Read / Update) ─────────────────────────
-
-
-@router.get("/api/mt5/credentials")
-async def get_mt5_credentials(user: dict = Depends(require_auth)) -> dict:
-    """Return saved MT5 credentials (login, server, connected status). Password excluded."""
-    import os
-    from config.settings import SUPABASE_DB_URI
-
-    uri = SUPABASE_DB_URI or os.getenv("SUPABASE_DB_URI")
-    if not uri:
-        return {"login": None, "server": None, "connected": False}
-
-    try:
-        from brain.db.supabase import _get_conn
-        conn = _get_conn(uri)
-        with conn, conn.cursor() as cur:
-            cur.execute(
-                "SELECT login, server, connected, account_name FROM mt5_credentials ORDER BY updated_at DESC LIMIT 1"
-            )
-            row = cur.fetchone()
-        conn.close()
-        if row:
-            return {
-                "login":     row[0],
-                "server":    row[1],
-                "connected": bool(row[2]),
-                "account_name": row[3] if len(row) > 3 else None,
-            }
-    except Exception as exc:
-        logger.warning("Failed to read MT5 credentials: %s", exc)
-
-    return {"login": None, "server": None, "connected": False}
-
-
 @router.get("/api/mt5/accounts")
 async def list_mt5_accounts(user: dict = Depends(require_auth)) -> dict:
-    """List all saved MT5 accounts."""
+    """List all saved MT5 accounts for the authenticated user."""
     import os
     from config.settings import SUPABASE_DB_URI
 
@@ -548,12 +541,17 @@ async def list_mt5_accounts(user: dict = Depends(require_auth)) -> dict:
     if not uri:
         return {"accounts": []}
 
+    user_id = user.get("sub")
+    if not user_id:
+        return {"accounts": []}
+
     try:
         from brain.db.supabase import _get_conn
         conn = _get_conn(uri)
         with conn, conn.cursor() as cur:
             cur.execute(
-                "SELECT login, server, connected, account_name, updated_at FROM mt5_credentials ORDER BY updated_at DESC"
+                "SELECT login, server, connected, account_name, updated_at FROM mt5_credentials WHERE user_id = %s ORDER BY updated_at DESC",
+                (user_id,),
             )
             rows = cur.fetchall()
         conn.close()
@@ -611,90 +609,6 @@ async def switch_mt5_account(req: SwitchAccountRequest, user: dict = Depends(req
     except Exception as exc:
         logger.warning("Failed to switch MT5 account: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
-
-
-class UpdateMT5CredentialsRequest(BaseModel):
-    server: str | None = None
-
-
-@router.put("/api/mt5/credentials")
-async def update_mt5_credentials(req: UpdateMT5CredentialsRequest, user: dict = Depends(require_auth)) -> dict:
-    """Update MT5 server field (e.g., after broker / account-type change)."""
-    import os
-    from config.settings import SUPABASE_DB_URI
-
-    uri = SUPABASE_DB_URI or os.getenv("SUPABASE_DB_URI")
-    if not uri or not req.server:
-        return {"status": "noop"}
-
-    try:
-        from brain.db.supabase import _get_conn
-        conn = _get_conn(uri)
-        with conn, conn.cursor() as cur:
-            cur.execute(
-                "UPDATE mt5_credentials SET server = %s, updated_at = NOW()",
-                (req.server,),
-            )
-        conn.close()
-        logger.info("MT5 credentials server updated to %s", req.server)
-    except Exception as exc:
-        logger.warning("Failed to update MT5 server: %s", exc)
-
-    return {"status": "updated", "server": req.server}
-
-
-# ── User Settings (KV via bot_state) ─────────────────────────
-
-
-@router.get("/api/settings")
-async def get_settings(user: dict = Depends(require_auth)) -> dict:
-    """Return user settings stored in bot_state KV store."""
-    from db import get_state, get_user_max_daily_trades
-
-    settings = get_state("app_settings", default={})
-    if not isinstance(settings, dict):
-        settings = {}
-
-    max_daily = settings.get("max_daily_trades") or get_user_max_daily_trades()
-
-    return {
-        "risk_percent":     settings.get("risk_percent", 5),
-        "be_policy":        settings.get("be_policy", "auto"),
-        "dry_run":          settings.get("dry_run", False),
-        "auto_compounding": settings.get("auto_compounding", False),
-        "display_name":     settings.get("display_name", "Trader"),
-        "max_daily_trades": max_daily,
-        "notifications":    settings.get("notifications", {}),
-    }
-
-
-class SettingsRequest(BaseModel):
-    risk_percent:     float | None = None
-    be_policy:        str | None = None
-    dry_run:          bool | None = None
-    auto_compounding: bool | None = None
-    display_name:     str | None = None
-    notifications:    dict | None = None
-    max_daily_trades: int | None = Field(default=None, ge=1, le=25)
-
-
-@router.post("/api/settings")
-async def update_settings(req: SettingsRequest, user: dict = Depends(require_auth)) -> dict:
-    """Save user settings to bot_state KV store (merged with existing)."""
-    from db import get_state, set_state, upsert_user_setting
-
-    settings = get_state("app_settings", default={})
-    if not isinstance(settings, dict):
-        settings = {}
-
-    updates = {k: v for k, v in req.model_dump(exclude_none=True).items() if v is not None}
-    settings.update(updates)
-    set_state("app_settings", settings)
-
-    if req.max_daily_trades is not None:
-        upsert_user_setting("default", "max_daily_trades", req.max_daily_trades)
-
-    return {"status": "saved"}
 
 
 # ── Support Ticket ────────────────────────────────────────

@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.bunny.net; font-src 'self' https://fonts.bunny.net; connect-src 'self'; img-src 'self' data: https://placehold.co; frame-ancestors 'none'; base-uri 'self';" />
   <link rel="icon" type="image/jpeg" href="logo.jpg" />
   <title>FUTURES – AI Copilot</title>
   <link href="https://fonts.bunny.net/css?family=inter:400;500;600;700&display=swap" rel="stylesheet" />
@@ -281,37 +282,7 @@
   </div>
 
   <script>
-    /**
-     * AI AGENT NOTE: AI COPILOT IMPLEMENTATION GUIDE
-     * -----------------------------------------------------------------------
-     * 1. BACKEND PROXY (Supabase Edge Function):
-     *    - NEVER expose DeepSeek API Key in the frontend.
-     *    - Create an Edge Function `chat-with-copilot` that accepts:
-     *      { message: string, user_id: string }
-     *    - Inside Edge Function:
-     *      a. Fetch user context from Supabase (balance, bot status, remaining trades, package tier).
-     *      b. Construct System Prompt:
-     *         "You are FUTURES. Concise (1-2 sentences). Trading context only. 
-     *          User Package: [Package Name]. Features: [Full/Limited]."
-     *      c. Pass context to DeepSeek API.
-     *      d. Handle Function Calling (Tools):
-     *         - `stop_bot`: Call POST /api/user/stop.
-     *         - `get_chart`: If Package != TRIAL, generate chart image via backend script, upload to Supabase Storage, return URL.
-     *      e. Return JSON: { text: string, imageUrl?: string, action?: 'stop_bot' }
-     *
-     * 2. IMAGE GENERATION (Paid Users Only):
-     *    - Check user package tier before allowing chart generation.
-     *    - If TRIAL user asks for chart, return text: "Charts are available for SPARK package and above."
-     *    - Image display: Use the <img> tag with the returned URL.
-     *
-     * 3. VOICE INPUT:
-     *    - Use Web Speech API (SpeechRecognition) for web prototype.
-     *    - In React Native: Use `expo-speech` or `@react-native-voice/voice`.
-     *
-     * 4. RATE LIMITING:
-     *    - Implement client-side debounce or counter to prevent spamming the API.
-     *    - Backend should also rate limit per user ID.
-     */
+    /** @deprecated Stub implementation - replace with real Edge Function call */
 
     // DOM Elements
     const chatArea = document.getElementById('chatArea');
@@ -353,8 +324,7 @@
       typingIndicator.classList.add('visible');
       chatArea.scrollTop = chatArea.scrollHeight;
 
-      // AI AGENT NOTE: Replace mock delay with actual fetch to Edge Function
-      // const response = await fetch(SUPABASE_URL + '/functions/v1/chat-with-copilot', { ... });
+      // @todo Replace mock delay with actual fetch to Edge Function
       
       try {
         // Simulate Network/API Latency
@@ -409,13 +379,12 @@
     }
 
     function toggleVoice() {
-      // AI AGENT NOTE: Implement SpeechRecognition API here.
-      // In React Native, use @react-native-voice/voice.
+      // @todo Implement Web Speech API SpeechRecognition
       alert("Voice input would activate microphone here.");
     }
 
     function goBack() {
-      // navigation.goBack();
+      // @todo Replace with proper back navigation when embedded
       window.history.back();
     }
   </script>

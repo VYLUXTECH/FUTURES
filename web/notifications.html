@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.bunny.net; font-src 'self' https://fonts.bunny.net; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'self';" />
   <link rel="icon" type="image/jpeg" href="logo.jpg" />
   <title>FUTURES – Notification Setup</title>
   <link href="https://fonts.bunny.net/css?family=inter:400;500;600;700&display=swap" rel="stylesheet" />
@@ -283,33 +284,7 @@
   <div class="toast" id="toast"></div>
 
   <script>
-    /**
-     * AI AGENT NOTE: PUSH NOTIFICATION PERMISSION & SETUP FLOW
-     * -----------------------------------------------------------------------
-     * 1. SYSTEM PERMISSION (React Native / Expo):
-     *    - Use `expo-notifications` library.
-     *    - On mount: Check current permission status via `getPermissionsAsync()`.
-     *    - When user toggles "Allow Push Notifications":
-     *      - If Android: Call `requestPermissionsAsync()`.
-     *      - If iOS: Call `requestPermissionsAsync()`.
-     *    - Update UI based on `status.granted`.
-     *    - If user previously denied and toggles on, prompt to open Settings app via `Linking.openSettings()`.
-     * 
-     * 2. GRANULAR PREFERENCES (Supabase):
-     *    - Store preferences in `profiles.notification_settings` (JSONB column).
-     *    - Structure: { trade_execution: true, trade_closed: true, daily_summary: true, safety: true, maintenance: true }
-     *    - When user clicks "Save Preferences", update the profile via Supabase client.
-     *    - Use the `safety` key for critical alerts like "3-loss cooldown" and "MT5 disconnected" (recommended to default true).
-     * 
-     * 3. NAVIGATION FLOW:
-     *    - This screen typically appears after "MT5 Connection" (onboarding) or from "Settings > Notifications".
-     *    - "Save Preferences" -> Redirect to Dashboard.
-     *    - "Skip for now" -> Redirect to Dashboard (with defaults).
-     * 
-     * 4. EDGE CASES:
-     *    - "Critical Alerts" (iOS): If possible, request critical alerts permission for the 3-loss cooldown notification.
-     *    - Background/Foreground Handling: Use `setNotificationHandler` to ensure alerts show even when the app is open.
-     */
+    /** @deprecated Stub implementation - replace with real push notification integration */
 
     // State
     const state = {
@@ -354,9 +329,7 @@
         statusDot.textContent = '⏳';
         statusText.textContent = 'Requesting...';
         
-        // AI AGENT NOTE: Replace with actual Expo request
-        // const { status } = await Notifications.requestPermissionsAsync();
-        // if (status === 'granted') { ... } else { ... }
+        // @todo Replace with actual Notification API request
 
         await new Promise(r => setTimeout(r, 800)); // Mock delay
 
@@ -401,15 +374,14 @@
       btn.innerHTML = '<span class="spinner"></span> Saving...';
 
       try {
-        // AI AGENT NOTE: Update Supabase Profile
-        // await supabase.from('profiles').update({ notification_settings: state.preferences }).eq('id', userId);
+        // @todo Update Supabase Profile with real query
         
         await new Promise(r => setTimeout(r, 800)); // Mock delay
 
         showToast('Preferences saved successfully!', 'success');
         
         setTimeout(() => {
-          // navigation.replace('Dashboard');
+          // @todo Navigate to Dashboard
           alert('Navigating to Dashboard...');
         }, 800);
       } catch (err) {

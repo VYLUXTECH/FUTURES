@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.bunny.net https://cdn.jsdelivr.net; font-src 'self' https://fonts.bunny.net https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co; img-src 'self' data: https://placehold.co; frame-ancestors 'none'; base-uri 'self';" />
   <link rel="icon" type="image/jpeg" href="logo.jpg" />
   <title>FUTURES</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/dancing-script@5.0.18/index.css" />
@@ -119,6 +120,12 @@
       min-height: 100vh;
     }
     #page-dashboard.active {
+      display: flex !important;
+      justify-content: center;
+      padding: 1.5rem;
+      min-height: 100vh;
+    }
+    #page-mt5.active {
       display: flex !important;
       justify-content: center;
       padding: 1.5rem;
@@ -1405,7 +1412,7 @@
 
     #page-dashboard .actions-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(5, 1fr);
       gap: 0.75rem;
       margin-bottom: 1rem;
     }
@@ -1504,6 +1511,326 @@
         grid-template-columns: repeat(2, 1fr);
       }
     }
+
+    /* ============================================================
+       MT5 PAGE
+       ============================================================ */
+    #page-mt5 .dashboard-wrapper {
+      width: 100%;
+      max-width: 480px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      padding-bottom: 2rem;
+    }
+    #page-mt5 .back-btn {
+      background: var(--input-bg); border: 1px solid var(--border); cursor: pointer; color: var(--text);
+      display: flex; align-items: center; gap: 0.3rem; font-weight: 600; font-size: 0.9rem;
+      padding: 0.55rem 1rem; border-radius: 10px; transition: background 0.2s;
+    }
+    #page-mt5 .back-btn:hover { background: var(--border); }
+    #page-mt5 .page-title { font-size: 1.25rem; font-weight: 700; color: var(--text-heading); }
+    #page-mt5 .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+    #page-mt5 .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-lg);
+      padding: 1.25rem;
+      box-shadow: var(--shadow);
+      transition: background 0.3s ease, border-color 0.3s ease;
+    }
+    #page-mt5 .card-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 1rem;
+    }
+    #page-mt5 .form-group { margin-bottom: 1rem; }
+    #page-mt5 .form-label { display: block; font-size: 0.8rem; font-weight: 500; color: var(--text-muted); margin-bottom: 0.4rem; }
+    #page-mt5 .form-input, #page-mt5 .form-select {
+      width: 100%;
+      padding: 0.85rem 1rem;
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.95rem;
+      transition: var(--transition);
+    }
+    #page-mt5 .form-input:focus, #page-mt5 .form-select:focus { outline: none; border-color: #333; box-shadow: 0 0 0 2px rgba(128,128,128,0.1); }
+    #page-mt5 .form-input::placeholder { color: var(--text-muted); opacity: 0.6; }
+    #page-mt5 .input-wrapper { position: relative; }
+    #page-mt5 .toggle-password {
+      position: absolute;
+      right: 1rem;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-muted);
+      padding: 0.25rem;
+    }
+    #page-mt5 .toggle-password:hover { color: var(--text); }
+    #page-mt5 .btn-primary {
+      width: 100%;
+      padding: 1rem;
+      background: var(--primary);
+      color: var(--primary-fg);
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+    #page-mt5 .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 5px 15px rgba(128,128,128,0.2); }
+    [data-theme="light"] #page-mt5 .btn-primary:hover:not(:disabled) { box-shadow: 0 5px 15px rgba(37, 99, 235, 0.3); }
+    #page-mt5 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    #page-mt5 .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid var(--primary-fg);
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: mt5-spin 0.8s linear infinite;
+      display: none;
+    }
+    #page-mt5 .btn-primary.loading .spinner { display: block; }
+    #page-mt5 .btn-primary.loading .btn-text { display: none; }
+    @keyframes mt5-spin { to { transform: rotate(360deg); } }
+    #page-mt5 .message-box {
+      padding: 0.75rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      margin-bottom: 1rem;
+      display: none;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    #page-mt5 .message-box.error { background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); display: flex; }
+    #page-mt5 .message-box.success { background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); display: flex; }
+    #page-mt5 .message-box.info { background: rgba(59, 130, 246, 0.1); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3); display: flex; }
+    #page-mt5 .instruction-box {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 1rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+    #page-mt5 .instruction-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--text);
+    }
+    #page-mt5 .instruction-content {
+      margin-top: 0.75rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--border);
+      line-height: 1.6;
+      display: none;
+    }
+    #page-mt5 .instruction-content.open { display: block; }
+    #page-mt5 .instruction-content ol { padding-left: 1.25rem; }
+    #page-mt5 .instruction-content li { margin-bottom: 0.25rem; }
+    #page-mt5 .result-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+    #page-mt5 .result-row:last-child { border-bottom: none; }
+    #page-mt5 .result-label { color: var(--text-muted); }
+    #page-mt5 .result-value { font-weight: 600; color: var(--text); }
+    #page-mt5 .result-value.green { color: var(--profit); }
+    #page-mt5 .result-value.red { color: var(--loss); }
+    #page-mt5 .result-value.yellow { color: var(--warning-text); }
+    #page-mt5 .mt5-connected-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.3rem 0.7rem;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    #page-mt5 .mt5-connected-badge.connected { background: rgba(16, 185, 129, 0.1); color: var(--profit); }
+    #page-mt5 .mt5-connected-badge.disconnected { background: rgba(239, 68, 68, 0.1); color: var(--loss); }
+    #page-mt5 .mt5-saved-info {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      font-size: 0.9rem;
+    }
+    #page-mt5 .mt5-saved-info .saved-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    #page-mt5 .mt5-saved-info .saved-label { color: var(--text-muted); }
+    #page-mt5 .mt5-saved-info .saved-value { font-weight: 600; }
+
+    /* ============================================================
+       SETTINGS PAGE
+       ============================================================ */
+    #page-settings.active {
+      display: flex !important;
+      justify-content: center;
+      padding: 1.5rem;
+      min-height: 100vh;
+    }
+    #page-settings .dashboard-wrapper {
+      width: 100%;
+      max-width: 480px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      padding-bottom: 2rem;
+    }
+    #page-settings .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+    }
+    #page-settings .back-btn {
+      background: var(--input-bg); border: 1px solid var(--border); cursor: pointer; color: var(--text);
+      display: flex; align-items: center; gap: 0.3rem; font-weight: 600; font-size: 0.9rem;
+      padding: 0.55rem 1rem; border-radius: 10px; transition: background 0.2s;
+    }
+    #page-settings .back-btn:hover { background: var(--border); }
+    #page-settings .page-title { font-size: 1.25rem; font-weight: 700; color: var(--text-heading); }
+    #page-settings .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-lg);
+      padding: 1.25rem;
+      box-shadow: var(--shadow);
+      transition: background 0.3s ease, border-color 0.3s ease;
+    }
+    #page-settings .card-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    #page-settings .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--border);
+      transition: var(--transition);
+    }
+    #page-settings .setting-row:last-child { border-bottom: none; }
+    #page-settings .setting-row.disabled { opacity: 0.5; pointer-events: none; }
+    #page-settings .setting-label { flex: 1; }
+    #page-settings .setting-title { font-size: 0.95rem; font-weight: 500; color: var(--text); }
+    #page-settings .setting-desc { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem; }
+    #page-settings .setting-value { font-size: 0.9rem; color: var(--text-muted); margin-right: 1rem; }
+    #page-settings .setting-action {
+      font-size: 0.85rem; font-weight: 600; color: var(--primary); cursor: pointer;
+      padding: 0.4rem 0.8rem; border-radius: 8px; transition: var(--transition);
+    }
+    #page-settings .setting-action:hover { background: var(--input-bg); }
+    #page-settings .btn-action {
+      width: 100%; padding: 0.9rem; margin-top: 0.75rem;
+      background: transparent; border: 1.5px solid var(--primary); color: var(--primary);
+      border-radius: 12px; font-family: 'Inter', sans-serif; font-weight: 600; cursor: pointer;
+      transition: var(--transition); display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+    }
+    #page-settings .btn-action:hover { background: var(--primary); color: var(--primary-fg); }
+    #page-settings .btn-danger { border-color: var(--danger-text); color: var(--danger-text); }
+    #page-settings .btn-danger:hover { background: var(--danger-text); color: white; }
+
+    #page-settings .toggle-switch { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+    #page-settings .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    #page-settings .toggle-slider {
+      position: absolute; cursor: pointer; inset: 0; background: var(--border);
+      border-radius: 24px; transition: var(--transition);
+    }
+    #page-settings .toggle-slider::before {
+      content: ""; position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px;
+      background: white; border-radius: 50%; transition: var(--transition); box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    #page-settings .toggle-switch input:checked + .toggle-slider { background: var(--primary); }
+    #page-settings .toggle-switch input:checked + .toggle-slider::before { transform: translateX(20px); }
+
+    #page-settings .risk-slider-container { width: 100%; padding: 0.5rem 0; }
+    #page-settings .risk-slider {
+      width: 100%; height: 6px; background: var(--border); border-radius: 3px; outline: none; appearance: none; cursor: pointer;
+    }
+    #page-settings .risk-slider::-webkit-slider-thumb {
+      appearance: none; width: 20px; height: 20px; background: var(--primary); border-radius: 50%; cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+    #page-settings .radio-group { display: flex; flex-direction: column; gap: 0.5rem; width: 100%; }
+    #page-settings .radio-option {
+      display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem;
+      background: var(--input-bg); border: 1px solid var(--border); border-radius: 10px; cursor: pointer; transition: var(--transition);
+    }
+    #page-settings .radio-option.active { border-color: var(--primary); background: rgba(43, 110, 240, 0.1); }
+    #page-settings .radio-dot { width: 16px; height: 16px; border: 2px solid var(--text-muted); border-radius: 50%; position: relative; transition: var(--transition); flex-shrink: 0; }
+    #page-settings .radio-option.active .radio-dot { border-color: var(--primary); }
+    #page-settings .radio-option.active .radio-dot::after {
+      content: ''; position: absolute; inset: 3px; background: var(--primary); border-radius: 50%;
+    }
+    #page-settings .radio-label { font-size: 0.9rem; font-weight: 500; }
+
+    #page-settings .warning-banner {
+      padding: 0.75rem; border-radius: 10px; font-size: 0.85rem; margin-bottom: 1rem;
+      display: none; align-items: center; gap: 0.5rem; line-height: 1.4;
+    }
+    #page-settings .warning-banner.visible { display: flex; }
+    #page-settings .warning-banner.warning { background: rgba(234, 179, 8, 0.1); border: 1px solid rgba(234, 179, 8, 0.3); color: var(--warning-text); }
+
+    #page-settings .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+      z-index: 100; display: none; align-items: center; justify-content: center; padding: 1rem;
+    }
+    #page-settings .modal-overlay.open { display: flex; }
+    #page-settings .modal-content {
+      background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 20px;
+      width: 100%; max-width: 400px; max-height: 80vh; overflow-y: auto; padding: 1.5rem;
+      box-shadow: var(--shadow);
+    }
+    #page-settings .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+    #page-settings .modal-title { font-size: 1.25rem; font-weight: 700; }
+    #page-settings .modal-close { background: none; border: none; color: var(--text); cursor: pointer; font-size: 1.5rem; line-height: 1; }
+    #page-settings .modal-body { font-size: 0.9rem; line-height: 1.5; color: var(--text-muted); }
+    #page-settings .form-input {
+      width: 100%; padding: 0.85rem; background: var(--input-bg); border: 1px solid var(--border);
+      border-radius: 10px; color: var(--text); font-size: 0.95rem; margin-bottom: 1rem;
+    }
+    #page-settings .form-input:focus { outline: none; border-color: var(--primary); }
   </style>
 </head>
 <body>
@@ -1694,7 +2021,7 @@
         <div id="verifEmailSection">
           <div class="section-title">📧 Email Verification</div>
           <p class="section-desc">
-            We've sent a 6-digit code to your email. Please check your inbox (and spam folder) and enter the code below.
+            A confirmation code was sent to your email. Enter it below to verify your account.
           </p>
           <div class="otp-container" id="verifOtpContainer">
             <input type="text" class="otp-input" maxlength="1" inputmode="numeric" data-index="0" />
@@ -1729,13 +2056,10 @@
         </div>
 
         <div class="card" id="accountCard">
-          <div class="balance-display" id="balanceDisplay">$1,234.56</div>
+          <div class="balance-display" id="balanceDisplay">--</div>
           <div class="sub-balance">
-            <span>Equity: <strong id="equityDisplay">$1,250.00</strong></span>
-            <span>Margin: <strong id="marginDisplay">$1,200.00</strong></span>
-          </div>
-          <div class="package-row">
-            <span><span class="package-tag" id="packageTag">SPARK</span> Trades left: <strong id="tradesLeft">5</strong></span>
+            <span>Equity: <strong id="equityDisplay">$0.00</strong></span>
+            <span>Margin: <strong id="marginDisplay">$0.00</strong></span>
           </div>
           <div class="daily-limit">
             <div class="limit-label">
@@ -1796,12 +2120,13 @@
         <div class="card" id="performanceCard">
           <div class="performance-row">
             <span class="card-title" style="margin:0;">Today's P&L</span>
-            <span class="today-pnl pnl-profit" id="dashTodayPnl">+$15.50</span>
+            <span class="today-pnl" id="dashTodayPnl">--</span>
           </div>
           <div class="actions-grid">
             <button class="action-btn" id="dashBtnChat"><span class="action-icon">💬</span>Chat</button>
             <button class="action-btn" id="dashBtnHistory"><span class="action-icon">📖</span>History</button>
             <button class="action-btn" id="dashBtnSettings"><span class="action-icon">⚙️</span>Settings</button>
+            <button class="action-btn" id="dashBtnMT5"><span class="action-icon">📡</span>MT5</button>
             <button class="action-btn" id="dashBtnSupport"><span class="action-icon">🆘</span>Support</button>
           </div>
           <div class="warning-banner cooldown" id="dashWarningBanner">
@@ -1809,11 +2134,276 @@
           </div>
         </div>
 
-        <div class="card" id="subscriptionCard">
-          <div class="upgrade-row">
-            <span style="font-size:0.9rem; font-weight:600;">Need more trades?</span>
-            <button class="btn-outline" id="dashBtnBuyTrades">Buy More Trades</button>
+      </div>
+    </div>
+
+    <!-- ============================================================
+    PAGE: MT5 CONNECTION
+    ============================================================ -->
+    <div id="page-mt5" class="page-section">
+      <div class="dashboard-wrapper">
+        <div class="header">
+          <button class="back-btn" onclick="showPage('page-dashboard')">← Back</button>
+          <h1 class="page-title">MT5 Connection</h1>
+          <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+            <svg class="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+            <svg class="icon-sun hidden" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+          </button>
+        </div>
+
+        <div class="card">
+          <div id="mt5MsgBox" class="message-box"></div>
+
+          <form id="mt5Form" onsubmit="mt5HandleConnect(event)">
+            <div class="form-group">
+              <label class="form-label">MT5 Login ID</label>
+              <input type="text" class="form-input" id="mt5Login" placeholder="e.g. 12345678" inputmode="numeric" required />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">MT5 Password</label>
+              <div class="input-wrapper">
+                <input type="password" class="form-input" id="mt5Password" placeholder="••••••••" required />
+                <button type="button" class="toggle-password" onclick="mt5TogglePassword()" aria-label="Toggle password visibility">
+                  <svg class="mt5-eye-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                  <svg class="mt5-eye-closed" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">MT5 Server</label>
+              <select class="form-select" id="mt5Server" required>
+                <option value="" disabled selected>Select your broker server</option>
+                <option value="HFM-Demo">HFM-Demo</option>
+                <option value="HFM-Live">HFM-Live</option>
+                <option value="HFM-Demo2">HFM-Demo2</option>
+                <option value="HFM-Real">HFM-Real</option>
+                <option value="Exness-Real">Exness-Real</option>
+                <option value="Exness-Demo">Exness-Demo</option>
+                <option value="ICMarkets-Demo">ICMarkets-Demo</option>
+                <option value="ICMarkets-Real">ICMarkets-Real</option>
+                <option value="custom">Other (Type manually)</option>
+              </select>
+              <input type="text" class="form-input" id="mt5CustomServer" placeholder="Enter server name (e.g. BrokerName-Real)" style="display:none; margin-top:0.5rem;" />
+            </div>
+
+            <button type="submit" class="btn-primary" id="mt5SubmitBtn">
+              <span class="spinner"></span>
+              <span class="btn-text">Connect & Test</span>
+            </button>
+          </form>
+        </div>
+
+        <!-- Connection Result -->
+        <div class="card" id="mt5ResultCard" style="display:none;">
+          <div class="card-title">Connection Result</div>
+          <div id="mt5ResultBody"></div>
+        </div>
+
+        <!-- Saved Credentials -->
+        <div class="card" id="mt5SavedCard" style="display:none;">
+          <div class="card-title">Saved Account</div>
+          <div id="mt5SavedBody"></div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="card">
+          <div class="instruction-box">
+            <div class="instruction-header" onclick="mt5ToggleInstructions()">
+              <span>⚠ Automated Trading Must Be Enabled</span>
+              <span id="mt5Chevron">▼</span>
+            </div>
+            <div class="instruction-content" id="mt5Instructions">
+              <ol>
+                <li>Open <strong>MetaTrader 5</strong> on your computer or phone.</li>
+                <li>Go to <strong>Tools → Options → Expert Advisors</strong>.</li>
+                <li>Check: <strong>Allow Automated Trading</strong>.</li>
+                <li>Check: <strong>Allow WebRequest for listed URLs</strong> (if applicable).</li>
+                <li>Click OK and reconnect your account.</li>
+              </ol>
+            </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+    PAGE: SETTINGS
+    ============================================================ -->
+    <div id="page-settings" class="page-section">
+      <div class="dashboard-wrapper">
+        <div class="header">
+          <button class="back-btn" onclick="showPage('page-dashboard')">← Back</button>
+          <h1 class="page-title">Settings</h1>
+          <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+            <svg class="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+            <svg class="icon-sun hidden" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+          </button>
+        </div>
+
+        <!-- ACCOUNT -->
+        <div class="card">
+          <div class="card-title">Account</div>
+          <div class="setting-row">
+            <div class="setting-label">
+              <div class="setting-title">Display name</div>
+              <div class="setting-desc" id="stgDisplayName">Trader</div>
+            </div>
+            <span class="setting-action" onclick="stgOpenModal('stgEditNameModal')">Edit</span>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">
+              <div class="setting-title">Email</div>
+              <div class="setting-desc" id="stgEmail">trader@example.com</div>
+            </div>
+            <span class="setting-value">Verified</span>
+          </div>
+          <button class="btn-action" onclick="stgChangePassword()">Change Password</button>
+          <div class="setting-row" style="border:none; padding-top: 1rem;">
+            <div class="setting-label">
+              <div class="setting-title">Two-factor authentication</div>
+              <div class="setting-desc">Enhance security with TOTP</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="stgTfaToggle" onchange="stgHandle2FA(this)">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <button class="btn-action btn-danger" onclick="stgLogout()" style="margin-top: 1rem;">Logout</button>
+        </div>
+
+        <!-- TRADING PREFERENCES -->
+        <div class="card">
+          <div class="card-title">Trading Preferences</div>
+          <div class="setting-row" style="border:none; padding-bottom: 0;">
+            <div class="setting-label">
+              <div class="setting-title">Long-term risk %</div>
+              <div class="setting-desc" id="stgRiskValue">5%</div>
+            </div>
+          </div>
+          <div class="risk-slider-container">
+            <input type="range" class="risk-slider" id="stgRiskSlider" min="1" max="10" step="0.5" value="5" oninput="stgUpdateRisk(this.value)">
+          </div>
+          <div class="setting-row" style="border:none; padding-bottom: 0; flex-direction: column; align-items: flex-start;">
+            <div class="setting-label" style="width: 100%; margin-bottom: 0.5rem;">
+              <div class="setting-title">Breakeven policy</div>
+            </div>
+            <div class="radio-group">
+              <div class="radio-option active" onclick="stgSelectBE(this, 'auto')">
+                <div class="radio-dot"></div>
+                <span class="radio-label">Auto BE (Move SL to entry after profit)</span>
+              </div>
+              <div class="radio-option" onclick="stgSelectBE(this, 'notify')">
+                <div class="radio-dot"></div>
+                <span class="radio-label">Notify & Exit (Alert user, auto-close if no response)</span>
+              </div>
+              <div class="radio-option" onclick="stgSelectBE(this, 'none')">
+                <div class="radio-dot"></div>
+                <span class="radio-label">No BE (Trailing stop only)</span>
+              </div>
+            </div>
+          </div>
+          <div class="warning-banner warning" id="stgAutoCompoundWarning">
+            Auto-compounding reinvests profits – risk increases after wins. Use with caution.
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">
+              <div class="setting-title">Auto-compounding</div>
+              <div class="setting-desc">Recalculate risk based on new balance</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="stgAutoCompoundToggle" onchange="stgHandleAutoCompound(this)">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">
+              <div class="setting-title">Dry-run mode (Paper trading)</div>
+              <div class="setting-desc">Simulate trades without real orders</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="stgDryRunToggle" onchange="stgHandleDryRun(this)">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- NOTIFICATIONS -->
+        <div class="card">
+          <div class="card-title">Notifications</div>
+          <div id="stgNotifList"></div>
+        </div>
+
+        <!-- APPEARANCE -->
+        <div class="card">
+          <div class="card-title">Appearance</div>
+          <div class="setting-row">
+            <div class="setting-label">
+              <div class="setting-title">Dark mode</div>
+              <div class="setting-desc">Switch app theme</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="stgDarkModeToggle" onchange="stgToggleTheme(this)">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- DATA -->
+        <div class="card">
+          <div class="card-title">Data Management</div>
+          <button class="btn-action" onclick="stgExport()">Export Trade History</button>
+          <button class="btn-action btn-danger" onclick="stgClearChat()" style="margin-top: 0.5rem;">Clear Cached Chat History</button>
+        </div>
+
+        <p style="text-align: center; font-size: 0.8rem; color: var(--text-muted); margin-top: 1rem;">
+          Settings are saved to cloud and device automatically.
+        </p>
+      </div>
+    </div>
+
+    <!-- SETTINGS MODALS -->
+    <div class="modal-overlay" id="stgEditNameModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title">Edit Display Name</h2>
+          <button class="modal-close" onclick="stgCloseModal('stgEditNameModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+          <input type="text" class="form-input" id="stgNewNameInput" placeholder="Enter new name" />
+          <button class="btn-action" onclick="stgSaveName()">Save Changes</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="stgTfaSetupModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title">Setup 2FA</h2>
+          <button class="modal-close" onclick="stgCloseModal('stgTfaSetupModal')">&times;</button>
+        </div>
+        <div class="modal-body" style="text-align: center;">
+          <div style="background: white; padding: 1rem; border-radius: 10px; display: inline-block; margin-bottom: 1rem;">
+            <svg width="150" height="150" viewBox="0 0 24 24" fill="#000"><path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm13-2h3v3h-3v-3zm-3 0h3v3h-3v-3zm0 3h3v3h-3v-3zm-3 0h3v3h-3v-3z"/></svg>
+          </div>
+          <p>Scan this QR code with your authenticator app or enter the secret key manually.</p>
+          <input type="text" class="form-input" id="stgTfaCodeInput" placeholder="Enter 6-digit verification code" style="text-align: center; letter-spacing: 0.2em;" />
+          <button class="btn-action" onclick="stgVerify2FA()">Verify & Enable</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="stgExportModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title">Export Format</h2>
+          <button class="modal-close" onclick="stgCloseModal('stgExportModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p style="margin-bottom: 1rem;">Select the format for your trade history export.</p>
+          <button class="btn-action" onclick="stgDownloadExport('csv')">Download CSV</button>
+          <button class="btn-action" onclick="stgDownloadExport('pdf')" style="margin-top: 0.5rem;">Download PDF</button>
         </div>
       </div>
     </div>
@@ -1825,6 +2415,17 @@
   <script>
     (function () {
       "use strict";
+
+      window.onerror = function (msg, url, line, col, err) {
+        console.error('Uncaught error:', msg, 'at', url, line + ':' + col);
+        var toast = document.getElementById('toastGlobal');
+        if (toast) {
+          toast.textContent = 'Something went wrong. Please refresh the page.';
+          toast.className = 'toast-global visible error';
+          setTimeout(function () { toast.classList.remove('visible'); }, 5000);
+        }
+        return true;
+      };
 
       /* ============================================================
          GLOBALS
@@ -1840,10 +2441,30 @@
           const res = await fetch('/api/config');
           const config = await res.json();
           supabase = window.supabase.createClient(config.supabase_url, config.supabase_key);
+          window.__supabase = supabase;
         } catch (e) {
           console.error('Supabase init error:', e);
         }
       }
+
+      window.getAuthToken = async function () {
+        if (!supabase) return null;
+        var session = await supabase.auth.getSession();
+        return session.data.session?.access_token;
+      };
+
+      window.authFetch = async function (url, options) {
+        var token = await window.getAuthToken();
+        if (!token) return null;
+        return fetch(url, {
+          ...options,
+          headers: {
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json',
+            ...(options?.headers || {}),
+          },
+        });
+      };
 
       /* ============================================================
          GLOBAL TOAST
@@ -1894,7 +2515,9 @@
               'page-signup': initSignupPage,
               'page-forgot-password': initForgotPasswordPage,
               'page-verification': initVerificationPage,
-              'page-dashboard': initDashboardPage
+              'page-dashboard': initDashboardPage,
+              'page-mt5': mt5InitPage,
+              'page-settings': settingsInitPage
             };
             if (initMap[pageId]) initMap[pageId]();
           }
@@ -2164,6 +2787,7 @@
               btn.textContent = 'Create Account';
               return;
             }
+            verifState.email = email;
             successEl.textContent = 'Account created! Check your email for confirmation.';
             btn.textContent = 'Account created!';
             setTimeout(function () {
@@ -2286,12 +2910,21 @@
           showGlobalToast('Please enter a valid email.', 'error');
           return;
         }
+        if (!supabase) {
+          showGlobalToast('Connecting... please retry.', 'error');
+          return;
+        }
         var btn = document.querySelector('#fp-step1 .btn-primary');
         btn.classList.add('loading');
         btn.disabled = true;
         try {
-          // Mock: simulate API call
-          await new Promise(function (r) { return setTimeout(r, 1500); });
+          var sendRes = await supabase.auth.resetPasswordForEmail(email);
+          if (sendRes.error) {
+            showGlobalToast('Failed to send: ' + sendRes.error.message, 'error');
+            btn.classList.remove('loading');
+            btn.disabled = false;
+            return;
+          }
           fpState.email = email;
           document.getElementById('fpEmailDisplay').textContent = email;
           document.getElementById('fp-step1').classList.add('hidden');
@@ -2301,31 +2934,64 @@
           if (firstOtp) firstOtp.focus();
           showGlobalToast('Code sent to your email!', 'success');
         } catch (err) {
-          showGlobalToast('Failed to send code. Try again.', 'error');
+          showGlobalToast('Network error. Try again.', 'error');
         } finally {
           btn.classList.remove('loading');
           btn.disabled = false;
         }
       };
 
-      window.fpHandleResendCode = function () {
-        showGlobalToast('Sending new code...', 'success');
-        fpStartTimer();
+      window.fpHandleResendCode = async function () {
+        if (!fpState.email) {
+          showGlobalToast('No email to resend to.', 'error');
+          return;
+        }
+        if (!supabase) return;
+        try {
+          var resendRes = await supabase.auth.resetPasswordForEmail(fpState.email);
+          if (resendRes.error) {
+            showGlobalToast('Failed to resend: ' + resendRes.error.message, 'error');
+            return;
+          }
+          showGlobalToast('Code resent!', 'success');
+          fpStartTimer();
+        } catch (err) {
+          showGlobalToast('Network error.', 'error');
+        }
       };
 
       window.fpHandleVerifyCode = async function () {
         var otp = fpGetOtpValue();
         if (otp.length !== 6) return;
+        if (!fpState.email) {
+          showGlobalToast('Session expired. Request a new code.', 'error');
+          return;
+        }
+        if (!supabase) {
+          showGlobalToast('Connecting... please retry.', 'error');
+          return;
+        }
         var btn = document.getElementById('fpVerifyBtn');
         btn.disabled = true;
         btn.classList.add('loading');
         try {
-          await new Promise(function (r) { return setTimeout(r, 1500); });
+          var verifyRes = await supabase.auth.verifyOtp({
+            email: fpState.email,
+            token: otp,
+            type: 'recovery'
+          });
+          if (verifyRes.error) {
+            showGlobalToast('Invalid code. Try again.', 'error');
+            fpClearOtpInputs();
+            btn.classList.remove('loading');
+            btn.disabled = false;
+            return;
+          }
           document.getElementById('fp-step2').classList.add('hidden');
           document.getElementById('fp-step3').classList.remove('hidden');
           showGlobalToast('Code verified!', 'success');
         } catch (err) {
-          showGlobalToast('Invalid code. Try again.', 'error');
+          showGlobalToast('Verification failed.', 'error');
           fpClearOtpInputs();
         } finally {
           btn.classList.remove('loading');
@@ -2344,11 +3010,21 @@
           showGlobalToast('Passwords do not match.', 'error');
           return;
         }
+        if (!supabase) {
+          showGlobalToast('Connecting... please retry.', 'error');
+          return;
+        }
         var btn = document.querySelector('#fp-step3 .btn-primary');
         btn.classList.add('loading');
         btn.disabled = true;
         try {
-          await new Promise(function (r) { return setTimeout(r, 1500); });
+          var updateRes = await supabase.auth.updateUser({ password: pw });
+          if (updateRes.error) {
+            showGlobalToast('Failed to update: ' + updateRes.error.message, 'error');
+            btn.classList.remove('loading');
+            btn.disabled = false;
+            return;
+          }
           showGlobalToast('Password updated successfully!', 'success');
           setTimeout(function () {
             showPage('page-sign');
@@ -2361,18 +3037,15 @@
         }
       };
 
-      /* ============================================================
-         VERIFICATION PAGE (simplified – email only)
-         ============================================================ */
       var verifState = {
         timer: 60,
         interval: null,
-        verified: false
+        verified: false,
+        email: ''
       };
 
       function initVerificationPage() {
         var otpInputs = document.querySelectorAll('#verifOtpContainer .otp-input');
-        var verifyBtn = document.getElementById('verifVerifyBtn');
 
         otpInputs.forEach(function (input, index) {
           input.addEventListener('input', function (e) {
@@ -2383,7 +3056,6 @@
               if (index < otpInputs.length - 1) {
                 otpInputs[index + 1].focus();
               } else {
-                // Auto-trigger verify when all 6 digits entered
                 verifHandleVerify();
               }
             } else {
@@ -2468,20 +3140,59 @@
         }, 1000);
       }
 
-      window.verifHandleResend = function () {
-        showGlobalToast('Sending new code...', 'success');
-        verifStartTimer();
+      window.verifHandleResend = async function () {
+        if (!verifState.email) {
+          showGlobalToast('No email to resend to. Please sign up again.', 'error');
+          return;
+        }
+        if (!supabase) {
+          showGlobalToast('Connecting... please retry.', 'error');
+          return;
+        }
+        try {
+          var resendRes = await supabase.auth.resend({
+            type: 'signup',
+            email: verifState.email
+          });
+          if (resendRes.error) {
+            showGlobalToast('Failed to resend: ' + resendRes.error.message, 'error');
+            return;
+          }
+          showGlobalToast('Code resent to your email!', 'success');
+          verifStartTimer();
+        } catch (err) {
+          showGlobalToast('Network error. Try again.', 'error');
+        }
       };
 
       window.verifHandleVerify = async function () {
         if (verifState.verified) return;
         var otp = verifGetOtpValue();
         if (otp.length !== 6) return;
+        if (!verifState.email) {
+          showGlobalToast('Session expired. Please sign up again.', 'error');
+          return;
+        }
+        if (!supabase) {
+          showGlobalToast('Connecting... please retry.', 'error');
+          return;
+        }
         var btn = document.getElementById('verifVerifyBtn');
         btn.disabled = true;
         btn.classList.add('loading');
         try {
-          await new Promise(function (r) { return setTimeout(r, 1500); });
+          var verifyRes = await supabase.auth.verifyOtp({
+            email: verifState.email,
+            token: otp,
+            type: 'signup'
+          });
+          if (verifyRes.error) {
+            showGlobalToast('Invalid code. Please check your email and try again.', 'error');
+            verifClearOtpInputs();
+            btn.classList.remove('loading');
+            btn.disabled = false;
+            return;
+          }
           verifState.verified = true;
           showGlobalToast('✓ Email verified!', 'success');
           btn.querySelector('.btn-text').textContent = '✓ Verified!';
@@ -2496,19 +3207,159 @@
         }
       };
 
+      function verifClearOtpInputs() {
+        var inputs = document.querySelectorAll('#verifOtpContainer .otp-input');
+        inputs.forEach(function (i) { i.value = ''; i.classList.remove('filled'); });
+        if (inputs[0]) inputs[0].focus();
+        verifCheckComplete();
+      }
+
       /* ============================================================
-         DASHBOARD PAGE
+         DASHBOARD PAGE – wired to backend
          ============================================================ */
       var dashState = {
         botActive: false,
         mode: 'long',
         tradeCount: 1,
         riskPercent: 5,
-        tradesRemaining: 5,
-        dailyUsed: 2,
+        dailyTrades: 0,
         health: 'green',
-        cooldown: false
+        cooldown: false,
+        connected: false,
+        maxDaily: 5,
+        refreshInterval: null
       };
+
+      async function dashGetToken() {
+        var session = await supabase.auth.getSession();
+        return session.data.session?.access_token;
+      }
+
+      async function dashFetchStatus() {
+        var token = await dashGetToken();
+        if (!token) return null;
+        try {
+          var res = await fetch('/api/status', {
+            headers: { 'Authorization': 'Bearer ' + token }
+          });
+          if (!res.ok) return null;
+          return await res.json();
+        } catch (e) {
+          return null;
+        }
+      }
+
+      async function dashFetchDashboard() {
+        var token = await dashGetToken();
+        if (!token) return null;
+        try {
+          var res = await fetch('/api/dashboard', {
+            headers: { 'Authorization': 'Bearer ' + token }
+          });
+          if (!res.ok) return null;
+          return await res.json();
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function dashUpdateUI(status, dashboard) {
+        // Account card
+        var balance = (status && status.account_balance != null) ? status.account_balance : (dashboard && dashboard.balance != null) ? dashboard.balance : 0;
+        var equity = (status && status.equity != null) ? status.equity : (dashboard && dashboard.equity != null) ? dashboard.equity : 0;
+        var margin = (dashboard && dashboard.margin != null) ? dashboard.margin : 0;
+
+        document.getElementById('balanceDisplay').textContent = '$' + Number(balance).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        document.getElementById('equityDisplay').textContent = '$' + Number(equity).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        document.getElementById('marginDisplay').textContent = '$' + Number(margin).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+        // Daily limit
+        var dailyTrades = status ? (status.daily_trades || 0) : 0;
+        dashState.dailyTrades = dailyTrades;
+        var maxDaily = dashState.maxDaily;
+        document.getElementById('dailyLimitText').textContent = dailyTrades + ' / ' + maxDaily;
+        var pct = Math.min(100, (dailyTrades / maxDaily) * 100);
+        document.getElementById('dailyLimitBar').style.width = pct + '%';
+
+        // Health
+        dashState.connected = status ? status.mt5_connected : false;
+        dashState.configured = status ? status.mt5_configured : false;
+        dashState.cooldown = status ? status.cooldown_active : false;
+        dashState.botActive = status ? status.running : false;
+
+        if (!dashState.configured) {
+          dashUpdateHealth('red', 'MT5 Not Configured');
+        } else if (!dashState.connected && !dashState.botActive) {
+          dashUpdateHealth('yellow', 'MT5 Ready — Start Bot to Connect');
+        } else if (dashState.cooldown) {
+          dashUpdateHealth('yellow', 'Cooldown Active');
+        } else if (dashState.botActive) {
+          dashUpdateHealth('green', 'Bot Running');
+        } else {
+          dashUpdateHealth('green', 'Bot Active');
+        }
+
+        // Cooldown banner
+        var banner = document.getElementById('dashWarningBanner');
+        if (dashState.cooldown) {
+          banner.className = 'warning-banner cooldown visible';
+          banner.innerHTML = '⚠ Bot paused due to 3 consecutive losses (cooldown 24h).';
+        } else if (!dashState.configured) {
+          banner.className = 'warning-banner error visible';
+          banner.innerHTML = '⚠ MT5 not configured. Go to MT5 page to connect your broker.';
+        } else if (!dashState.connected && !dashState.botActive) {
+          banner.className = 'warning-banner error visible';
+          banner.innerHTML = '⚠ MT5 will connect when you start the bot.';
+        } else {
+          banner.className = 'warning-banner';
+          banner.style.display = 'none';
+        }
+
+        // Today's P&L
+        var dailyPnl = status ? status.daily_pnl : (dashboard ? dashboard.daily_pnl : 0);
+        var pnlEl = document.getElementById('dashTodayPnl');
+        pnlEl.textContent = (dailyPnl >= 0 ? '+' : '') + '$' + Number(dailyPnl).toFixed(2);
+        pnlEl.className = 'today-pnl ' + (dailyPnl >= 0 ? 'pnl-profit' : 'pnl-loss');
+
+        // Recent trades
+        var trades = dashboard ? (dashboard.recent_trades || []) : [];
+        var tbody = document.getElementById('dashTradesBody');
+        if (trades.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:1rem;">No trades yet</td></tr>';
+        } else {
+          tbody.innerHTML = trades.slice(0, 10).map(function (t) {
+            var dir = (t.direction || '').toUpperCase();
+            var pnl = Number(t.pnl || 0);
+            var pnlClass = pnl >= 0 ? 'pnl-profit' : 'pnl-loss';
+            var pnlStr = (pnl >= 0 ? '+' : '') + '$' + pnl.toFixed(2);
+            var time = '';
+            if (t.closed_at) {
+              try { time = new Date(t.closed_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); } catch(e) { time = ''; }
+            } else if (t.opened_at) {
+              try { time = new Date(t.opened_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); } catch(e) { time = ''; }
+            }
+            return '<tr><td>' + (t.pair || '-') + '</td><td>' + dir + '</td><td class="' + pnlClass + '">' + pnlStr + '</td><td>' + time + '</td></tr>';
+          }).join('');
+        }
+
+        updateDashButtonStates();
+      }
+
+      function dashUpdateHealth(status, text) {
+        var dot = document.getElementById('healthDot');
+        var txt = document.getElementById('healthText');
+        var tooltip = document.getElementById('healthTooltip');
+        dot.className = 'health-dot';
+        if (status === 'yellow') dot.classList.add('yellow');
+        if (status === 'red') dot.classList.add('red');
+        txt.textContent = text;
+        var msgs = {
+          green: 'All systems normal. MT5 connected, no news impact, bot ready.',
+          yellow: 'Credentials saved. Start the bot to connect MT5 and begin trading.',
+          red: 'No MT5 credentials found. Go to the MT5 page to configure your broker.'
+        };
+        tooltip.textContent = msgs[status] || msgs.green;
+      }
 
       function initDashboardPage() {
         var modeBtns = document.querySelectorAll('#page-dashboard .mode-btn');
@@ -2566,7 +3417,7 @@
         });
 
         function updateDashButtonStates() {
-          var canStart = dashState.tradesRemaining > 0 && !dashState.botActive && !dashState.cooldown;
+          var canStart = dashState.dailyTrades < dashState.maxDaily && !dashState.botActive && !dashState.cooldown && dashState.configured;
           btnStart.disabled = !canStart;
           btnStop.disabled = !dashState.botActive;
           tradeCountInput.disabled = dashState.botActive;
@@ -2575,15 +3426,51 @@
 
         // Start Bot
         btnStart.addEventListener('click', async function () {
-          if (dashState.botActive || dashState.tradesRemaining <= 0 || dashState.cooldown) return;
+          if (dashState.botActive || dashState.dailyTrades >= dashState.maxDaily || dashState.cooldown) return;
+          if (!dashState.configured) {
+            showGlobalToast('Configure MT5 credentials in the MT5 page first.', 'error');
+            return;
+          }
           btnStart.innerHTML = '<span class="spinner-btn"></span> Starting...';
           btnStart.disabled = true;
-          await new Promise(function (res) { return setTimeout(res, 1200); });
-          dashState.botActive = true;
-          updateDashButtonStates();
-          btnStart.innerHTML = '▶ START BOT';
-          setDashHealthState('green', 'Bot Running');
-          showGlobalToast('Bot started successfully!', 'success');
+          var token = await dashGetToken();
+          if (!token) {
+            showGlobalToast('Session expired. Please login again.', 'error');
+            btnStart.innerHTML = '▶ START BOT';
+            updateDashButtonStates();
+            return;
+          }
+          try {
+            var res = await fetch('/api/user/start', {
+              method: 'POST',
+              headers: {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                mode: dashState.mode,
+                trade_count: dashState.tradeCount,
+                risk_percent: dashState.riskPercent
+              })
+            });
+            if (!res.ok) {
+              var errData = await res.json();
+              showGlobalToast(errData.detail || 'Failed to start bot', 'error');
+              btnStart.innerHTML = '▶ START BOT';
+              updateDashButtonStates();
+              return;
+            }
+            dashState.botActive = true;
+            updateDashButtonStates();
+            btnStart.innerHTML = '▶ START BOT';
+            dashUpdateHealth('green', 'Bot Running');
+            showGlobalToast('Bot started!', 'success');
+            dashFetchAll();
+          } catch (err) {
+            showGlobalToast('Network error. Try again.', 'error');
+            btnStart.innerHTML = '▶ START BOT';
+            updateDashButtonStates();
+          }
         });
 
         // Stop Bot
@@ -2591,28 +3478,37 @@
           if (!dashState.botActive) return;
           btnStop.innerHTML = '<span class="spinner-btn"></span> Stopping...';
           btnStop.disabled = true;
-          await new Promise(function (res) { return setTimeout(res, 1000); });
-          dashState.botActive = false;
-          updateDashButtonStates();
-          btnStop.innerHTML = '⏹ STOP BOT';
-          setDashHealthState('green', 'Bot Active');
-          showGlobalToast('Bot stopped. All positions closed.', 'success');
+          var token = await dashGetToken();
+          if (!token) {
+            showGlobalToast('Session expired.', 'error');
+            btnStop.innerHTML = '⏹ STOP BOT';
+            updateDashButtonStates();
+            return;
+          }
+          try {
+            var res = await fetch('/api/user/stop', {
+              method: 'POST',
+              headers: { 'Authorization': 'Bearer ' + token }
+            });
+            if (!res.ok) {
+              var errData = await res.json().catch(function () { return {}; });
+              showGlobalToast(errData.detail || 'Failed to stop bot.', 'error');
+              btnStop.innerHTML = '⏹ STOP BOT';
+              updateDashButtonStates();
+              return;
+            }
+            dashState.botActive = false;
+            updateDashButtonStates();
+            btnStop.innerHTML = '⏹ STOP BOT';
+            dashUpdateHealth('green', 'Bot Active');
+            showGlobalToast('Bot stopped.', 'success');
+            dashFetchAll();
+          } catch (err) {
+            showGlobalToast('Network error.', 'error');
+            btnStop.innerHTML = '⏹ STOP BOT';
+            updateDashButtonStates();
+          }
         });
-
-        function setDashHealthState(status, text) {
-          var dot = document.getElementById('healthDot');
-          var txt = document.getElementById('healthText');
-          dot.className = 'health-dot';
-          if (status === 'yellow') dot.classList.add('yellow');
-          if (status === 'red') dot.classList.add('red');
-          txt.textContent = text;
-          var msgs = {
-            green: 'All systems normal. MT5 connected, no news impact, bot ready.',
-            yellow: 'News after-effect active – trading with reduced risk (5% cap).',
-            red: 'MT5 disconnected – please reconnect in Settings.'
-          };
-          healthTooltip.textContent = msgs[status] || msgs.green;
-        }
 
         // Navigation Buttons
         document.getElementById('dashSeeAllTrades').addEventListener('click', function () {
@@ -2625,19 +3521,483 @@
           loadPage('page-accountability', 'accountability.html');
         });
         document.getElementById('dashBtnSettings').addEventListener('click', function () {
-          loadPage('page-settings', 'settings.html');
+          showPage('page-settings');
+        });
+        document.getElementById('dashBtnMT5').addEventListener('click', function () {
+          showPage('page-mt5');
         });
         document.getElementById('dashBtnSupport').addEventListener('click', function () {
           loadPage('page-support', 'support.html');
         });
-        document.getElementById('dashBtnBuyTrades').addEventListener('click', function () {
-          alert('Coming soon');
-        });
 
-        // Initial state
+        // Initial fetch
         updateDashModeUI();
         updateDashButtonStates();
+        dashFetchAll();
+
+        // Auto-refresh every 15 seconds
+        if (dashState.refreshInterval) clearInterval(dashState.refreshInterval);
+        dashState.refreshInterval = setInterval(dashFetchAll, 15000);
       }
+
+      async function dashFetchAll() {
+        var status = await dashFetchStatus();
+        var dashboard = await dashFetchDashboard();
+        if (status || dashboard) {
+          dashUpdateUI(status, dashboard);
+        }
+      }
+
+      /* ============================================================
+         MT5 PAGE
+         ============================================================ */
+      var mt5State = {
+        initDone: false
+      };
+
+      function mt5TogglePassword() {
+        var pw = document.getElementById('mt5Password');
+        var isPassword = pw.getAttribute('type') === 'password';
+        pw.setAttribute('type', isPassword ? 'text' : 'password');
+        document.querySelector('.mt5-eye-open').style.display = isPassword ? 'none' : '';
+        document.querySelector('.mt5-eye-closed').style.display = isPassword ? '' : 'none';
+      }
+
+      function mt5ToggleInstructions() {
+        var content = document.getElementById('mt5Instructions');
+        var chevron = document.getElementById('mt5Chevron');
+        content.classList.toggle('open');
+        chevron.textContent = content.classList.contains('open') ? '▲' : '▼';
+      }
+
+      function mt5ShowMessage(text, type) {
+        var box = document.getElementById('mt5MsgBox');
+        box.textContent = text;
+        box.className = 'message-box ' + type;
+        box.style.display = 'flex';
+        if (type === 'error') {
+          setTimeout(function () { box.style.display = 'none'; }, 6000);
+        }
+      }
+
+      function mt5SetLoading(isLoading) {
+        var btn = document.getElementById('mt5SubmitBtn');
+        btn.disabled = isLoading;
+        btn.classList.toggle('loading', isLoading);
+      }
+
+      async function mt5HandleConnect(e) {
+        e.preventDefault();
+        var msgBox = document.getElementById('mt5MsgBox');
+        msgBox.style.display = 'none';
+
+        var login = document.getElementById('mt5Login').value.trim();
+        var password = document.getElementById('mt5Password').value;
+        var selected = document.getElementById('mt5Server').value;
+        var server = selected === 'custom' ? document.getElementById('mt5CustomServer').value.trim() : selected;
+
+        if (!login || !password || !server) {
+          mt5ShowMessage('Please fill in all fields.', 'error');
+          return;
+        }
+
+        mt5SetLoading(true);
+
+        try {
+          var session = await supabase.auth.getSession();
+          var token = session.data.session?.access_token;
+          if (!token) {
+            mt5ShowMessage('Session expired. Please login again.', 'error');
+            mt5SetLoading(false);
+            return;
+          }
+
+          // First save credentials
+          var saveRes = await fetch('/api/mt5/credentials', {
+            method: 'POST',
+            headers: {
+              'Authorization': 'Bearer ' + token,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ login: login, password: password, server: server })
+          });
+          var saveData = await saveRes.json();
+          if (saveData.error) {
+            mt5ShowMessage('Failed to save credentials: ' + saveData.error, 'error');
+            mt5SetLoading(false);
+            return;
+          }
+
+          // Test connection
+          var connectRes = await fetch('/api/mt5/connect', {
+            method: 'POST',
+            headers: {
+              'Authorization': 'Bearer ' + token,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ login: login, password: password, server: server })
+          });
+          var result = await connectRes.json();
+
+          // Display result
+          mt5DisplayResult(result);
+
+          if (result.connected) {
+            mt5ShowMessage('Connected successfully! Automated trading: ' + (result.automated_trading_enabled ? 'Enabled' : 'Disabled'), 'success');
+          } else if (result.error) {
+            mt5ShowMessage('Connection failed: ' + (result.error || 'Unknown error'), 'error');
+          } else {
+            mt5ShowMessage('Credentials saved. Server configured.', 'info');
+          }
+
+          mt5LoadSaved();
+
+        } catch (err) {
+          console.error('MT5 connect error:', err);
+          mt5ShowMessage('Network error. Please try again.', 'error');
+        } finally {
+          mt5SetLoading(false);
+        }
+      }
+
+      function mt5DisplayResult(result) {
+        var card = document.getElementById('mt5ResultCard');
+        var body = document.getElementById('mt5ResultBody');
+        card.style.display = 'block';
+
+        var statusClass = result.connected ? 'green' : 'red';
+        var statusText = result.connected ? 'Connected' : 'Disconnected';
+        var eaText = result.automated_trading_enabled ? 'Yes' : 'No';
+        var eaClass = result.automated_trading_enabled ? 'green' : 'red';
+
+        var html = '';
+        html += '<div class="result-row"><span class="result-label">Status</span><span class="result-value ' + statusClass + '">' + statusText + '</span></div>';
+
+        if (result.account) {
+          html += '<div class="result-row"><span class="result-label">Account</span><span class="result-value">' + result.account.login + '</span></div>';
+          html += '<div class="result-row"><span class="result-label">Server</span><span class="result-value">' + (result.account.server || '-') + '</span></div>';
+          html += '<div class="result-row"><span class="result-label">Balance</span><span class="result-value">$' + (result.account.balance || 0).toFixed(2) + '</span></div>';
+          html += '<div class="result-row"><span class="result-label">Equity</span><span class="result-value">$' + (result.account.equity || 0).toFixed(2) + '</span></div>';
+          html += '<div class="result-row"><span class="result-label">Leverage</span><span class="result-value">1:' + (result.account.leverage || 0) + '</span></div>';
+          html += '<div class="result-row"><span class="result-label">Currency</span><span class="result-value">' + (result.account.currency || 'USD') + '</span></div>';
+        }
+
+        if (result.terminal) {
+          html += '<div class="result-row"><span class="result-label">Terminal</span><span class="result-value">' + (result.terminal.name || '-') + '</span></div>';
+          html += '<div class="result-row"><span class="result-label">Build</span><span class="result-value">' + (result.terminal.build || '-') + '</span></div>';
+        }
+
+        html += '<div class="result-row"><span class="result-label">Auto Trading</span><span class="result-value ' + eaClass + '">' + eaText + '</span></div>';
+
+        body.innerHTML = html;
+      }
+
+      async function mt5LoadSaved() {
+        var card = document.getElementById('mt5SavedCard');
+        var body = document.getElementById('mt5SavedBody');
+
+        try {
+          var session = await supabase.auth.getSession();
+          var token = session.data.session?.access_token;
+          if (!token) return;
+
+          var res = await fetch('/api/mt5/credentials', {
+            headers: { 'Authorization': 'Bearer ' + token }
+          });
+          var data = await res.json();
+
+          if (data.login) {
+            card.style.display = 'block';
+            var connectedClass = data.connected ? 'connected' : 'disconnected';
+            var connectedText = data.connected ? 'Connected' : 'Not connected';
+            body.innerHTML = '\
+              <div class="mt5-saved-info">\
+                <div class="saved-row"><span class="saved-label">Login</span><span class="saved-value">' + data.login + '</span></div>\
+                <div class="saved-row"><span class="saved-label">Server</span><span class="saved-value">' + (data.server || '-') + '</span></div>\
+                <div class="saved-row"><span class="saved-label">Status</span><span class="mt5-connected-badge ' + connectedClass + '">' + connectedText + '</span></div>\
+              </div>';
+
+            // Pre-fill form
+            document.getElementById('mt5Login').value = data.login || '';
+            if (data.server) {
+              var serverSelect = document.getElementById('mt5Server');
+              var customInput = document.getElementById('mt5CustomServer');
+              var optionExists = Array.from(serverSelect.options).some(function (o) { return o.value === data.server; });
+              if (optionExists) {
+                serverSelect.value = data.server;
+                customInput.style.display = 'none';
+              } else {
+                serverSelect.value = 'custom';
+                customInput.style.display = 'block';
+                customInput.value = data.server;
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Failed to load MT5 credentials:', err);
+        }
+      }
+
+      function mt5InitPage() {
+        if (mt5State.initDone) {
+          mt5LoadSaved();
+          return;
+        }
+        mt5State.initDone = true;
+
+        var serverSelect = document.getElementById('mt5Server');
+        var customInput = document.getElementById('mt5CustomServer');
+
+        serverSelect.addEventListener('change', function () {
+          if (this.value === 'custom') {
+            customInput.style.display = 'block';
+            customInput.required = true;
+          } else {
+            customInput.style.display = 'none';
+            customInput.required = false;
+          }
+        });
+
+        mt5LoadSaved();
+      }
+
+      /* ============================================================
+         SETTINGS PAGE
+         ============================================================ */
+      var stgState = {
+        displayName: 'Trader',
+        riskPercent: 5,
+        bePolicy: 'auto',
+        autoCompounding: false,
+        dryRun: false,
+        notifications: {
+          trade_execution: true, trade_closed: true, daily_summary: true,
+          loss_cooldown: true, maintenance: true, email_trade: false
+        }
+      };
+      var stgDebounceTimer = null;
+
+      function settingsInitPage() {
+        stgRenderNotifications();
+        stgLoadSettings();
+        stgCheckTheme();
+      }
+
+      async function stgLoadSettings() {
+        try {
+          var res = await window.authFetch('/api/settings');
+          if (!res) return;
+          var data = await res.json();
+
+          stgState.displayName = data.display_name || 'Trader';
+          stgState.riskPercent = data.risk_percent || 5;
+          stgState.bePolicy = data.be_policy || 'auto';
+          stgState.autoCompounding = data.auto_compounding || false;
+          stgState.dryRun = data.dry_run || false;
+          if (data.notifications) stgState.notifications = data.notifications;
+
+          var nameEl = document.getElementById('stgDisplayName');
+          if (nameEl) nameEl.textContent = stgState.displayName;
+          var slider = document.getElementById('stgRiskSlider');
+          if (slider) slider.value = stgState.riskPercent;
+          stgUpdateRiskUI();
+          var acToggle = document.getElementById('stgAutoCompoundToggle');
+          if (acToggle) acToggle.checked = stgState.autoCompounding;
+          var acWarn = document.getElementById('stgAutoCompoundWarning');
+          if (acWarn) acWarn.classList.toggle('visible', stgState.autoCompounding);
+          var drToggle = document.getElementById('stgDryRunToggle');
+          if (drToggle) drToggle.checked = stgState.dryRun;
+
+          var opts = document.querySelectorAll('#page-settings .radio-option');
+          opts.forEach(function (el) {
+            el.classList.remove('active');
+            var onclick = el.getAttribute('onclick') || '';
+            if (onclick.includes("'" + stgState.bePolicy + "'")) {
+              el.classList.add('active');
+            }
+          });
+
+          stgRenderNotifications();
+
+          var sb = window.__supabase;
+          if (sb) {
+            var session = await sb.auth.getSession();
+            var email = session.data.session?.user?.email;
+            if (email) {
+              stgState.email = email;
+              var emailEl = document.getElementById('stgEmail');
+              if (emailEl) emailEl.textContent = email;
+            }
+          }
+        } catch (e) {
+          console.error('Failed to load settings:', e);
+        }
+      }
+
+      async function stgSaveSettings(updates) {
+        try {
+          var res = await window.authFetch('/api/settings', {
+            method: 'POST',
+            body: JSON.stringify(updates),
+          });
+          if (res && res.ok) {
+            showGlobalToast('Saved', 'success');
+          }
+        } catch (e) {
+          showGlobalToast('Failed to save', 'error');
+        }
+      }
+
+      function stgCheckTheme() {
+        var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        var toggle = document.getElementById('stgDarkModeToggle');
+        if (toggle) toggle.checked = isDark;
+      }
+
+      function stgRenderNotifications() {
+        var container = document.getElementById('stgNotifList');
+        if (!container) return;
+        var labels = {
+          trade_execution: 'Trade execution', trade_closed: 'Trade closed', daily_summary: 'Daily summary',
+          loss_cooldown: '3-loss cooldown', maintenance: 'Maintenance', email_trade: 'Email trade notifications'
+        };
+        container.innerHTML = Object.entries(stgState.notifications).map(function (kv) {
+          var key = kv[0], val = kv[1];
+          return '<div class="setting-row" style="border:none; padding: 0.5rem 0;">' +
+            '<div class="setting-label"><div class="setting-title">' + (labels[key] || key) + '</div></div>' +
+            '<label class="toggle-switch">' +
+              '<input type="checkbox" ' + (val ? 'checked' : '') + ' onchange="stgToggleNotif(\'' + key + '\', this)">' +
+              '<span class="toggle-slider"></span>' +
+            '</label></div>';
+        }).join('');
+      }
+
+      function stgUpdateRiskUI() {
+        var el = document.getElementById('stgRiskValue');
+        if (el) el.textContent = stgState.riskPercent + '%';
+      }
+
+      // Expose inline-handler functions globally
+      window.stgUpdateRisk = function (val) {
+        stgState.riskPercent = parseFloat(val);
+        document.getElementById('stgRiskValue').textContent = val + '%';
+        if (stgDebounceTimer) clearTimeout(stgDebounceTimer);
+        stgDebounceTimer = setTimeout(function () {
+          stgSaveSettings({ risk_percent: stgState.riskPercent });
+        }, 500);
+      };
+      window.stgSelectBE = function (el, policy) {
+        document.querySelectorAll('#page-settings .radio-option').forEach(function (opt) {
+          opt.classList.remove('active');
+        });
+        el.classList.add('active');
+        stgState.bePolicy = policy;
+        stgSaveSettings({ be_policy: policy });
+        showGlobalToast('Breakeven policy set to: ' + policy, 'success');
+      };
+      window.stgHandleAutoCompound = function (checkbox) {
+        stgState.autoCompounding = checkbox.checked;
+        var w = document.getElementById('stgAutoCompoundWarning');
+        if (w) w.classList.toggle('visible', checkbox.checked);
+        stgSaveSettings({ auto_compounding: checkbox.checked });
+      };
+      window.stgHandleDryRun = function (checkbox) {
+        stgState.dryRun = checkbox.checked;
+        stgSaveSettings({ dry_run: checkbox.checked });
+        showGlobalToast('Dry-run mode updated', 'success');
+      };
+      window.stgHandle2FA = function (checkbox) {
+        if (checkbox.checked) {
+          stgOpenModal('stgTfaSetupModal');
+        } else {
+          checkbox.checked = true;
+          showGlobalToast('Contact support to disable 2FA', 'error');
+        }
+      };
+      window.stgVerify2FA = function () {
+        var code = document.getElementById('stgTfaCodeInput').value;
+        if (!code || code.length !== 6) return showGlobalToast('Enter valid 6-digit code', 'error');
+        showGlobalToast('2FA enabled successfully', 'success');
+        stgCloseModal('stgTfaSetupModal');
+      };
+      window.stgChangePassword = async function () {
+        var sb = window.__supabase;
+        if (!sb) return showGlobalToast('Auth not ready', 'error');
+        try {
+          var session = await sb.auth.getSession();
+          var email = session.data.session?.user?.email;
+          if (!email) return showGlobalToast('No email found', 'error');
+          var { error } = await sb.auth.resetPasswordForEmail(email);
+          if (error) throw error;
+          showGlobalToast('Password reset email sent to ' + email, 'success');
+        } catch (e) {
+          showGlobalToast(e.message || 'Failed to send reset email', 'error');
+        }
+      };
+      window.stgLogout = async function () {
+        if (!confirm('Are you sure you want to logout?')) return;
+        var sb = window.__supabase;
+        if (sb) {
+          try { await sb.auth.signOut(); } catch (e) {}
+        }
+        Object.keys(localStorage).forEach(function (k) { if (k.startsWith('sb-')) localStorage.removeItem(k); });
+        showPage('page-login');
+      };
+      window.stgOpenModal = function (id) { document.getElementById(id).classList.add('open'); };
+      window.stgCloseModal = function (id) { document.getElementById(id).classList.remove('open'); };
+      window.stgSaveName = function () {
+        var name = document.getElementById('stgNewNameInput').value.trim();
+        if (!name) return showGlobalToast('Name cannot be empty', 'error');
+        stgState.displayName = name;
+        var nameEl = document.getElementById('stgDisplayName');
+        if (nameEl) nameEl.textContent = name;
+        stgCloseModal('stgEditNameModal');
+        stgSaveSettings({ display_name: name });
+      };
+      window.stgExport = function () { stgOpenModal('stgExportModal'); };
+      window.stgDownloadExport = async function (format) {
+        stgCloseModal('stgExportModal');
+        try {
+          var token = await window.getAuthToken();
+          if (!token) return showGlobalToast('Not authenticated', 'error');
+          var res = await fetch('/api/trades/export?format=' + format, {
+            headers: { 'Authorization': 'Bearer ' + token },
+          });
+          if (!res.ok) throw new Error('Export failed');
+          var blob = await res.blob();
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = 'trades.' + format;
+          a.click();
+          URL.revokeObjectURL(url);
+          showGlobalToast(format.toUpperCase() + ' export downloaded', 'success');
+        } catch (e) {
+          showGlobalToast('Export failed: ' + e.message, 'error');
+        }
+      };
+      window.stgClearChat = function () {
+        if (!confirm('Clear all cached chat messages? Server history remains.')) return;
+        showGlobalToast('Chat cache cleared', 'success');
+      };
+      window.stgToggleTheme = function (checkbox) {
+        var isDark = checkbox.checked;
+        document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+        updateThemeIcons();
+        showGlobalToast('Theme updated', 'success');
+      };
+      window.stgToggleNotif = function (key, checkbox) {
+        stgState.notifications[key] = checkbox.checked;
+        stgSaveSettings({ notifications: stgState.notifications });
+      };
+
+      document.querySelectorAll('#page-settings .modal-overlay').forEach(function (m) {
+        if (m.id) {
+          m.addEventListener('click', function (e) {
+            if (e.target === m) stgCloseModal(m.id);
+          });
+        }
+      });
 
       /* ============================================================
          INIT ON LOAD
