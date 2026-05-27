@@ -305,49 +305,6 @@ async def copilot_analyze(req: CopilotRequest, request: Request, user: dict = De
     return result
 
 
-class CopilotChatRequest(BaseModel):
-    message: str
-    history: list[dict] | None = None
-
-
-@router.post("/api/copilot/chat")
-async def copilot_chat(req: CopilotChatRequest, request: Request, user: dict = Depends(require_auth)) -> dict:
-    """Chat with the AI Copilot. Supports function calling for account info, trades, chart gen, and actions."""
-    from api.copilot_chat import chat_completion, _decode_jwt_payload
-
-    jwt_payload = _decode_jwt_payload(request)
-    user_id = jwt_payload.get("sub") or request.client.host or "anonymous"
-    email = jwt_payload.get("email")
-    display_name = jwt_payload.get("user_metadata", {}).get("display_name")
-
-    messages = (req.history or []) + [{"role": "user", "content": req.message}]
-
-    result = await chat_completion(messages, user_id, _bot_state, email, display_name)
-    return result
-
-
-class ConfirmRequest(BaseModel):
-    confirmation_id: str
-
-
-@router.post("/api/copilot/confirm")
-async def copilot_confirm(req: ConfirmRequest, request: Request, user: dict = Depends(require_auth)) -> dict:
-    """Confirm and execute a pending action from the copilot."""
-    from api.copilot_chat import execute_confirmation, _decode_jwt_payload
-
-    jwt_payload = _decode_jwt_payload(request)
-    user_id = jwt_payload.get("sub") or request.client.host or "anonymous"
-
-    result = await execute_confirmation(req.confirmation_id, user_id, _bot_state)
-    return result
-
-
-@router.post("/api/copilot/clear")
-async def copilot_clear(user: dict = Depends(require_auth)) -> dict:
-    """Clear copilot chat state (no-op, state is on frontend)."""
-    return {"status": "ok"}
-
-
 # ── MT5 Credentials (Connect / Save) ──────────────────────
 
 class MT5ConnectRequest(BaseModel):
