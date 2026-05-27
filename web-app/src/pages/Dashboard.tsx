@@ -13,6 +13,7 @@ export default function Dashboard({ navigate }: Props) {
   const [riskPercent, setRiskPercent] = useState(5);
   const [botActive, setBotActive] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: string } | null>(null);
+  const [showTip, setShowTip] = useState(false);
 
   const { data: status, refetch: refetchStatus } = useQuery({
     queryKey: ['status'], queryFn: fetchStatus, refetchInterval: 15000,
@@ -81,84 +82,115 @@ export default function Dashboard({ navigate }: Props) {
   return (
     <div className="page page-dashboard">
       {toast && <div className={`toast-global visible ${toast.type}`}>{toast.msg}</div>}
+
       {banner && (
         <div className={`warning-banner ${banner.type} visible`}>
           {banner.text}
           {!configured && <span style={{ cursor: 'pointer', textDecoration: 'underline', marginLeft: '0.5rem' }} onClick={() => navigate('mt5')}>Configure now</span>}
         </div>
       )}
+
       <div className="card">
-        <div className="health-row">
+        <div className="balance-display">${Number(balance).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+        <div className="sub-balance">
+          <span>Equity: <strong>${Number(equity).toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong></span>
+          <span>Margin: <strong>${Number(margin).toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong></span>
+        </div>
+        <div className="daily-limit">
+          <div className="limit-label">
+            <span>Daily used</span>
+            <span>{dailyTrades} / {maxDaily}</span>
+          </div>
+          <div className="limit-bar-bg">
+            <div className="limit-bar-fill" style={{ width: `${Math.min(100, (dailyTrades / maxDaily) * 100)}%` }} />
+          </div>
+        </div>
+        <div className="health-row" onClick={() => setShowTip(!showTip)}>
           <span className={`health-dot ${health.color}`} />
-          <span>{health.label}</span>
+          <span className="health-text">{health.label}</span>
         </div>
       </div>
+
       <div className="card">
-        <h2>Account</h2>
-        <div className="stat-row"><span>Balance</span><span>${Number(balance).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
-        <div className="stat-row"><span>Equity</span><span>${Number(equity).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
-        <div className="stat-row"><span>Margin</span><span>${Number(margin).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
-        <div className="stat-row"><span>Today's P&L</span><span className={dailyPnl >= 0 ? 'pnl-profit' : 'pnl-loss'}>{dailyPnl >= 0 ? '+' : ''}${Number(dailyPnl).toFixed(2)}</span></div>
-      </div>
-      <div className="card">
-        <h2>Daily Trades</h2>
-        <p>{dailyTrades} / {maxDaily}</p>
-        <div className="progress-bar"><div className="progress-fill" style={{ width: `${Math.min(100, (dailyTrades / maxDaily) * 100)}%` }} /></div>
-      </div>
-      <div className="card">
-        <h2>Bot Control</h2>
+        <div className="controls-row">
+          <button className="btn-control btn-start" onClick={handleStart} disabled={!canStart}>▶ START BOT</button>
+          <button className="btn-control btn-stop" onClick={handleStop} disabled={!botActive}>⏹ STOP BOT</button>
+        </div>
         <div className="mode-selector">
           {(['long', 'short', 'both'] as Mode[]).map((m) => (
             <button key={m} className={`mode-btn ${mode === m ? 'active' : ''}`} onClick={() => setMode(m)} disabled={botActive}>
-              {m.charAt(0).toUpperCase() + m.slice(1)}
+              {m === 'long' ? 'Long-term' : m === 'short' ? 'Short-term' : 'Both'}
             </button>
           ))}
         </div>
         {mode === 'long' && (
-          <div className="form-group">
-            <label>Trades per cycle</label>
-            <input type="number" min={1} max={5} value={tradeCount}
+          <div className="stat-row">
+            <span>Number of trades</span>
+            <input type="number" className="param-input" min={1} max={5} value={tradeCount}
               onChange={(e) => setTradeCount(Math.max(1, Math.min(5, parseInt(e.target.value, 10) || 1)))}
-              disabled={botActive} />
+              disabled={botActive} style={{ width: 60, padding: '0.4rem', background: 'var(--bg)', border: '1px solid var(--card-border)', borderRadius: 6, color: 'var(--text)', textAlign: 'center', fontFamily: 'Inter, sans-serif' }} />
           </div>
         )}
-        {mode !== 'long' && <p className="text-muted">Short/both modes trade once per cycle</p>}
-        <div className="form-group">
-          <label>Risk per trade: {riskPercent}%</label>
-          <input type="range" min={1} max={10} value={riskPercent} onChange={(e) => setRiskPercent(parseInt(e.target.value, 10))} disabled={botActive} />
+        {mode === 'short' && (
+          <p style={{ background: 'var(--bg)', border: '1px solid var(--card-border)', borderRadius: 10, padding: '0.75rem', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+            One trade will be executed, then bot stops. Adjust risk as needed.
+          </p>
+        )}
+        <div className="stat-row">
+          <span>Risk %</span>
+          <span>{riskPercent}%</span>
         </div>
-        <div className="btn-row">
-          <button className="btn-primary" onClick={handleStart} disabled={!canStart}>▶ START BOT</button>
-          <button className="btn-danger" onClick={handleStop} disabled={!botActive}>⏹ STOP BOT</button>
-        </div>
+        <input type="range" min={1} max={10} step={0.5} value={riskPercent}
+          onChange={(e) => setRiskPercent(parseFloat(e.target.value))} disabled={botActive}
+          style={{ width: '100%', marginTop: '0.5rem', accentColor: 'var(--primary)' }} />
       </div>
+
       <div className="card">
-        <h2>Recent Trades</h2>
+        <h2 style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>📋 Recent Trades</h2>
         {trades.length === 0 ? (
           <p className="text-muted">No trades yet</p>
         ) : (
-          <table className="trades-table">
-            <thead><tr><th>Pair</th><th>Dir</th><th>P&L</th><th>Time</th></tr></thead>
-            <tbody>
-              {trades.slice(0, 10).map((t, i) => {
-                const pnl = Number(t.pnl ?? 0);
-                const time = t.closed_at
-                  ? new Date(t.closed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                  : t.opened_at
-                    ? new Date(t.opened_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                    : '';
-                return (
-                  <tr key={i}>
-                    <td>{t.pair ?? '-'}</td>
-                    <td>{(t.direction ?? '').toUpperCase()}</td>
-                    <td className={pnl >= 0 ? 'pnl-profit' : 'pnl-loss'}>{pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}</td>
-                    <td>{time}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <>
+            <table className="trades-table">
+              <thead><tr><th>Pair</th><th>Type</th><th>P&L</th><th>Time</th></tr></thead>
+              <tbody>
+                {trades.slice(0, 10).map((t, i) => {
+                  const pnl = Number(t.pnl ?? 0);
+                  const time = t.closed_at
+                    ? new Date(t.closed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    : t.opened_at
+                      ? new Date(t.opened_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                      : '';
+                  return (
+                    <tr key={i}>
+                      <td>{t.pair ?? '-'}</td>
+                      <td>{(t.direction ?? '').toUpperCase()}</td>
+                      <td className={pnl >= 0 ? 'pnl-profit' : 'pnl-loss'}>{pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}</td>
+                      <td>{time}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <span className="see-all-link" onClick={() => navigate('accountability')}>See all →</span>
+          </>
         )}
+      </div>
+
+      <div className="card">
+        <div className="performance-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Today's P&L</span>
+          <span className={dailyPnl >= 0 ? 'pnl-profit' : 'pnl-loss'} style={{ fontSize: '1.5rem', fontWeight: 700 }}>
+            {dailyPnl >= 0 ? '+' : ''}${Number(dailyPnl).toFixed(2)}
+          </span>
+        </div>
+        <div className="actions-grid">
+          <button className="action-btn" onClick={() => navigate('copilot')}><span className="action-icon">💬</span>Chat</button>
+          <button className="action-btn" onClick={() => navigate('accountability')}><span className="action-icon">📖</span>History</button>
+          <button className="action-btn" onClick={() => navigate('settings')}><span className="action-icon">⚙️</span>Settings</button>
+          <button className="action-btn" onClick={() => navigate('mt5')}><span className="action-icon">📡</span>MT5</button>
+          <button className="action-btn" onClick={() => navigate('support')}><span className="action-icon">🆘</span>Support</button>
+        </div>
       </div>
     </div>
   );
