@@ -18,11 +18,19 @@ export interface DashboardData {
 }
 
 export interface Trade {
+  ticket?: number;
   pair?: string;
   direction?: string;
+  lots?: number;
+  entry_price?: number;
+  close_price?: number;
+  sl_price?: number;
+  tp_price?: number;
   pnl?: number;
+  status?: string;
   opened_at?: string;
   closed_at?: string;
+  confidence?: number;
   volume?: number;
   commission?: number;
   swap?: number;

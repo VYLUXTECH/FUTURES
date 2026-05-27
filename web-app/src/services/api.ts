@@ -1,5 +1,5 @@
 import { getSupabase, getAuthToken } from './supabase';
-import type { StatusData, DashboardData } from '../types';
+import type { StatusData, DashboardData, Trade } from '../types';
 
 // ─── Auth (via Supabase SDK) ────────────────────────────────
 export { getSupabase, getAuthToken };
@@ -155,6 +155,15 @@ export async function saveSettings(updates: Record<string, unknown>): Promise<bo
     });
     return res?.ok ?? false;
   } catch { return false; }
+}
+
+// ─── Trades ───────────────────────────────────────────────
+export async function fetchTrades(limit = 50): Promise<{ trades: Trade[]; count: number } | null> {
+  try {
+    const res = await authFetch(`/api/trades?limit=${limit}`);
+    if (!res || !res.ok) return null;
+    return res.json();
+  } catch { return null; }
 }
 
 // ─── Copilot ──────────────────────────────────────────────
