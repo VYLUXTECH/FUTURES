@@ -204,7 +204,7 @@ class RiskEngine:
         risk_percent: float | None = None,
         auto_compound: bool = False,
     ) -> float:
-        from config.constants import COMMISSION_PER_LOT
+        from brain.config.constants import COMMISSION_PER_LOT
 
         if risk_percent is None:
             risk_percent = DEFAULT_RISK_PERCENT

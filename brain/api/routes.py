@@ -69,8 +69,8 @@ class BotStatusResponse(BaseModel):
 @router.get("/health")
 async def health() -> dict:
     """Lightweight health check. Does NOT block trading loop."""
-    from db import test_connection
-    from config.settings import SUPABASE_DB_URI
+    from brain.db import test_connection
+    from brain.config.settings import SUPABASE_DB_URI
 
     loop = asyncio.get_event_loop()
     terminal = await loop.run_in_executor(None, mt5.terminal_info)
@@ -100,7 +100,7 @@ async def health() -> dict:
 async def bot_status(user: dict = Depends(require_auth)) -> BotStatusResponse:
     """Full bot status for dashboard header."""
     from datetime import datetime, timezone
-    from config.constants import SESSION_START_UTC, SESSION_END_UTC
+    from brain.config.constants import SESSION_START_UTC, SESSION_END_UTC
 
     loop = asyncio.get_event_loop()
     account = await loop.run_in_executor(None, mt5.account_info)
@@ -125,7 +125,7 @@ async def bot_status(user: dict = Depends(require_auth)) -> BotStatusResponse:
     if user_id:
         try:
             import os
-            from config.settings import SUPABASE_DB_URI
+            from brain.config.settings import SUPABASE_DB_URI
             uri = SUPABASE_DB_URI or os.getenv("SUPABASE_DB_URI")
             if uri:
                 from brain.db.supabase import _get_conn
@@ -214,7 +214,7 @@ async def start_bot(req: StartBotRequest | None = None, request: Request = None,
     user_id = jwt_payload.get("sub")
     if user_id:
         import os
-        from config.settings import SUPABASE_DB_URI
+        from brain.config.settings import SUPABASE_DB_URI
         uri = SUPABASE_DB_URI or os.getenv("SUPABASE_DB_URI")
         if uri:
             try:
@@ -242,7 +242,7 @@ async def start_bot(req: StartBotRequest | None = None, request: Request = None,
     if req:
         risk_pct = req.risk_percent
         if risk_pct is not None:
-            from config.constants import MIN_RISK_PERCENT, MAX_RISK_PERCENT
+            from brain.config.constants import MIN_RISK_PERCENT, MAX_RISK_PERCENT
             risk_pct = max(MIN_RISK_PERCENT, min(MAX_RISK_PERCENT, risk_pct))
             _bot_state["risk_percent"] = risk_pct
         mode = req.mode or "short"
@@ -323,7 +323,7 @@ async def mt5_connect(req: MT5ConnectRequest, user: dict = Depends(require_auth)
     Supports multiple accounts via account_name field.
     """
     import os
-    from config.settings import SUPABASE_DB_URI
+    from brain.config.settings import SUPABASE_DB_URI
 
     result: dict = {
         "status": "credentials_saved",
@@ -492,7 +492,7 @@ async def mt5_info(user: dict = Depends(require_auth)) -> dict:
 async def list_mt5_accounts(user: dict = Depends(require_auth)) -> dict:
     """List all saved MT5 accounts for the authenticated user."""
     import os
-    from config.settings import SUPABASE_DB_URI
+    from brain.config.settings import SUPABASE_DB_URI
 
     uri = SUPABASE_DB_URI or os.getenv("SUPABASE_DB_URI")
     if not uri:
@@ -540,7 +540,7 @@ async def switch_mt5_account(req: SwitchAccountRequest, user: dict = Depends(req
         raise HTTPException(status_code=400, detail="Stop the bot before switching accounts")
 
     import os
-    from config.settings import SUPABASE_DB_URI
+    from brain.config.settings import SUPABASE_DB_URI
 
     uri = SUPABASE_DB_URI or os.getenv("SUPABASE_DB_URI")
     if not uri:
@@ -601,7 +601,7 @@ async def create_support_ticket(req: SupportTicketRequest, request: Request, use
     """Submit a support ticket. Stores in Supabase + forwards to Telegram admin.
     The user never knows about the Telegram forwarding — it stays in the backend."""
     import os
-    from config.settings import SUPABASE_DB_URI
+    from brain.config.settings import SUPABASE_DB_URI
 
     uri = SUPABASE_DB_URI or os.getenv("SUPABASE_DB_URI")
     jwt_payload = _decode_jwt(request)

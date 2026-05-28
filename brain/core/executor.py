@@ -62,7 +62,7 @@ def place_order(
     user_id: str | None = None,
 ) -> dict | None:
     if slippage_pips is None:
-        from config.constants import MAX_SLIPPAGE_PIPS
+        from brain.config.constants import MAX_SLIPPAGE_PIPS
         slippage_pips = MAX_SLIPPAGE_PIPS
 
     if get_state(DRY_RUN_KEY, default=False):

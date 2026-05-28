@@ -265,7 +265,7 @@ def log_signal(
 
 def get_user_max_daily_trades(user_id: str | None = None, uri: str | None = None) -> int:
     """Fetch max_daily_trades for a user from Supabase. Falls back to default."""
-    from config.constants import MAX_DAILY_TRADES
+    from brain.config.constants import MAX_DAILY_TRADES
     if not user_id:
         return MAX_DAILY_TRADES
     rows = _exec_query(
