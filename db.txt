@@ -26,7 +26,12 @@ END $$;
 
 -- Drop triggers
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+DROP TRIGGER IF EXISTS trg_profiles_updated_at ON public.profiles;
+DROP TRIGGER IF EXISTS trg_user_settings_updated_at ON public.user_settings;
+DROP TRIGGER IF EXISTS trg_mt5_credentials_updated_at ON public.mt5_credentials;
+DROP TRIGGER IF EXISTS trg_bot_state_updated_at ON public.bot_state;
 DROP FUNCTION IF EXISTS handle_new_user();
+DROP FUNCTION IF EXISTS update_updated_at();
 
 -- Drop tables (order matters due to FK dependencies)
 DROP TABLE IF EXISTS public.legal_acceptances CASCADE;
@@ -44,12 +49,23 @@ DROP TABLE IF EXISTS public.profiles CASCADE;
 -- PART 2: CREATE TABLES
 -- ============================================================
 
+-- ── 0. Shared trigger function ─────────────────────────────
+CREATE OR REPLACE FUNCTION update_updated_at()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$;
+
 -- ── 1. profiles ─────────────────────────────────────────────
 -- User profiles, linked to Supabase Auth. Created automatically on signup.
 CREATE TABLE public.profiles (
     id                  UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-    risk_percent        FLOAT DEFAULT 5.0,
-    be_policy           TEXT DEFAULT 'auto',
+    risk_percent        NUMERIC(4,1) DEFAULT 5.0 CHECK (risk_percent >= 0 AND risk_percent <= 100),
+    be_policy           TEXT DEFAULT 'auto' CHECK (be_policy IN ('auto', 'manual', 'disabled')),
     dry_run             BOOLEAN DEFAULT FALSE,
     auto_compounding    BOOLEAN DEFAULT FALSE,
     display_name        VARCHAR(100) DEFAULT 'Trader',
@@ -62,23 +78,28 @@ CREATE TABLE public.profiles (
     updated_at          TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TRIGGER trg_profiles_updated_at
+    BEFORE UPDATE ON public.profiles
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
 -- ── 2. trades ───────────────────────────────────────────────
 -- All trade records. One row per MT5 ticket.
 CREATE TABLE public.trades (
     ticket          BIGINT PRIMARY KEY,
     user_id         UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
     pair            TEXT NOT NULL,
-    direction       TEXT NOT NULL,
-    lots            REAL NOT NULL,
-    entry_price     REAL NOT NULL,
-    sl_price        REAL,
-    tp_price        REAL,
-    close_price     REAL,
+    direction       TEXT NOT NULL CHECK (direction IN ('BUY', 'SELL')),
+    lots            REAL NOT NULL CHECK (lots > 0),
+    entry_price     REAL NOT NULL CHECK (entry_price > 0),
+    sl_price        REAL CHECK (sl_price IS NULL OR sl_price > 0),
+    tp_price        REAL CHECK (tp_price IS NULL OR tp_price > 0),
+    close_price     REAL CHECK (close_price IS NULL OR close_price > 0),
     pnl             REAL,
-    status          TEXT NOT NULL DEFAULT 'OPEN',
+    status          TEXT NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'CLOSED', 'CANCELLED')),
     opened_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     closed_at       TIMESTAMPTZ,
-    confidence      INTEGER DEFAULT 0,
+    confidence      INTEGER DEFAULT 0 CHECK (confidence >= 0 AND confidence <= 100),
     sectors_json    TEXT
 );
 
@@ -86,17 +107,22 @@ CREATE TABLE public.trades (
 -- Key-value store for bot settings, cooldowns, etc.
 CREATE TABLE public.bot_state (
     key             TEXT PRIMARY KEY,
-    value           TEXT NOT NULL,
+    value           JSONB NOT NULL,
     updated_at      TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE TRIGGER trg_bot_state_updated_at
+    BEFORE UPDATE ON public.bot_state
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
 
 -- ── 4. signals ──────────────────────────────────────────────
 -- Log of every signal the bot generates (even if not traded).
 CREATE TABLE public.signals (
     id              BIGSERIAL PRIMARY KEY,
     pair            TEXT NOT NULL,
-    direction       TEXT NOT NULL,
-    confidence      INTEGER DEFAULT 0,
+    direction       TEXT NOT NULL CHECK (direction IN ('BUY', 'SELL')),
+    confidence      INTEGER DEFAULT 0 CHECK (confidence >= 0 AND confidence <= 100),
     alignment       TEXT,
     sectors_json    TEXT,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -106,7 +132,7 @@ CREATE TABLE public.signals (
 -- MT5 login credentials per user. Supports multiple accounts per user.
 CREATE TABLE public.mt5_credentials (
     id                          BIGSERIAL PRIMARY KEY,
-    user_id                     UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    user_id                     UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     login                       VARCHAR(50) NOT NULL,
     password                    VARCHAR(500) NOT NULL,
     server                      VARCHAR(100) NOT NULL,
@@ -119,6 +145,11 @@ CREATE TABLE public.mt5_credentials (
     UNIQUE(user_id, login, server)
 );
 
+CREATE TRIGGER trg_mt5_credentials_updated_at
+    BEFORE UPDATE ON public.mt5_credentials
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
 -- ── 6. support_tickets ──────────────────────────────────────
 -- User support requests.
 CREATE TABLE public.support_tickets (
@@ -127,32 +158,37 @@ CREATE TABLE public.support_tickets (
     email           TEXT,
     subject         TEXT,
     message         TEXT,
-    status          TEXT DEFAULT 'open',
+    status          TEXT DEFAULT 'open' CHECK (status IN ('open', 'in_progress', 'resolved', 'closed')),
     created_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
--- ── 6b. user_settings ──────────────────────────────────────
--- Per-user configuration overrides (max_daily_trades, etc.)
+-- ── 7. user_settings ───────────────────────────────────────
+-- Per-user configuration overrides.
+-- risk_percent lives in profiles; this table holds extras.
 CREATE TABLE public.user_settings (
     user_id             UUID PRIMARY KEY REFERENCES public.profiles(id) ON DELETE CASCADE,
-    max_daily_trades    INTEGER DEFAULT 5,
-    risk_percent        FLOAT DEFAULT 5.0,
-    trading_mode        TEXT DEFAULT 'short',
+    max_daily_trades    INTEGER DEFAULT 5 CHECK (max_daily_trades > 0 AND max_daily_trades <= 20),
+    trading_mode        TEXT DEFAULT 'short' CHECK (trading_mode IN ('short', 'long')),
     updated_at          TIMESTAMPTZ DEFAULT NOW()
 );
 
--- ── 7. system_logs ──────────────────────────────────────────
+CREATE TRIGGER trg_user_settings_updated_at
+    BEFORE UPDATE ON public.user_settings
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+-- ── 8. system_logs ──────────────────────────────────────────
 -- Admin action & error logging.
 CREATE TABLE public.system_logs (
     id              BIGSERIAL PRIMARY KEY,
-    user_id         TEXT,
+    user_id         UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
     action          TEXT,
     detail          TEXT,
-    level           TEXT DEFAULT 'INFO',
+    level           TEXT DEFAULT 'INFO' CHECK (level IN ('INFO', 'WARN', 'ERROR')),
     created_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
--- ── 8. news_state ───────────────────────────────────────────
+-- ── 9. news_state ───────────────────────────────────────────
 -- News monitoring phase state (used by Telegram admin bot).
 CREATE TABLE public.news_state (
     id              BIGSERIAL PRIMARY KEY,
@@ -160,7 +196,7 @@ CREATE TABLE public.news_state (
     updated_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
--- ── 9. legal_acceptances ────────────────────────────────────
+-- ── 10. legal_acceptances ───────────────────────────────────
 -- Records when a user views/accepts Terms & Risk Disclosure.
 CREATE TABLE public.legal_acceptances (
     id                  BIGSERIAL PRIMARY KEY,
@@ -172,8 +208,6 @@ CREATE TABLE public.legal_acceptances (
     scroll_verified     BOOLEAN DEFAULT FALSE,
     created_at          TIMESTAMPTZ DEFAULT NOW()
 );
-
-
 
 -- ============================================================
 -- PART 3: INDEXES
@@ -200,6 +234,7 @@ CREATE INDEX idx_system_logs_created    ON public.system_logs(created_at DESC);
 
 CREATE INDEX idx_legal_acceptances_user ON public.legal_acceptances(user_id);
 
+CREATE INDEX idx_bot_state_updated      ON public.bot_state(updated_at DESC);
 
 -- ============================================================
 -- PART 4: ROW LEVEL SECURITY (RLS)
@@ -217,7 +252,6 @@ ALTER TABLE public.legal_acceptances    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_settings        ENABLE ROW LEVEL SECURITY;
 
 -- ── profiles ────────────────────────────────────────────────
--- Users can read & update their own profile
 CREATE POLICY "Users can view own profile"
     ON public.profiles FOR SELECT
     USING (auth.uid() = id);
@@ -230,36 +264,30 @@ CREATE POLICY "Users can insert own profile"
     ON public.profiles FOR INSERT
     WITH CHECK (auth.uid() = id);
 
--- Service role can do everything (for backend/Telegram bot)
 CREATE POLICY "Service role full access profiles"
     ON public.profiles FOR ALL
     USING (true) WITH CHECK (true);
 
 -- ── trades ──────────────────────────────────────────────────
--- Users can read their own trades
 CREATE POLICY "Users can view own trades"
     ON public.trades FOR SELECT
     USING (auth.uid() = user_id);
 
--- Service role can insert/update trades (bot does this)
 CREATE POLICY "Service role full access trades"
     ON public.trades FOR ALL
     USING (true) WITH CHECK (true);
 
 -- ── bot_state ───────────────────────────────────────────────
--- Service role only (bot reads/writes settings)
 CREATE POLICY "Service role full access bot_state"
     ON public.bot_state FOR ALL
     USING (true) WITH CHECK (true);
 
 -- ── signals ─────────────────────────────────────────────────
--- Service role only (bot logs signals)
 CREATE POLICY "Service role full access signals"
     ON public.signals FOR ALL
     USING (true) WITH CHECK (true);
 
 -- ── mt5_credentials ─────────────────────────────────────────
--- Users can read & write their own credentials
 CREATE POLICY "Users can view own mt5 credentials"
     ON public.mt5_credentials FOR SELECT
     USING (auth.uid() = user_id);
@@ -276,13 +304,11 @@ CREATE POLICY "Users can delete own mt5 credentials"
     ON public.mt5_credentials FOR DELETE
     USING (auth.uid() = user_id);
 
--- Service role can do everything
 CREATE POLICY "Service role full access mt5_credentials"
     ON public.mt5_credentials FOR ALL
     USING (true) WITH CHECK (true);
 
 -- ── support_tickets ─────────────────────────────────────────
--- Users can read & insert their own tickets
 CREATE POLICY "Users can view own tickets"
     ON public.support_tickets FOR SELECT
     USING (auth.uid() = user_id);
@@ -291,36 +317,30 @@ CREATE POLICY "Users can insert own tickets"
     ON public.support_tickets FOR INSERT
     WITH CHECK (auth.uid() = user_id);
 
--- Service role can do everything
 CREATE POLICY "Service role full access support_tickets"
     ON public.support_tickets FOR ALL
     USING (true) WITH CHECK (true);
 
 -- ── system_logs ─────────────────────────────────────────────
--- Service role only
 CREATE POLICY "Service role full access system_logs"
     ON public.system_logs FOR ALL
     USING (true) WITH CHECK (true);
 
 -- ── news_state ──────────────────────────────────────────────
--- Service role only
 CREATE POLICY "Service role full access news_state"
     ON public.news_state FOR ALL
     USING (true) WITH CHECK (true);
 
 -- ── legal_acceptances ───────────────────────────────────────
--- Users can insert their own acceptances
 CREATE POLICY "Users can insert own legal acceptance"
     ON public.legal_acceptances FOR INSERT
     WITH CHECK (auth.uid() = user_id);
 
--- Service role can do everything
 CREATE POLICY "Service role full access legal_acceptances"
     ON public.legal_acceptances FOR ALL
     USING (true) WITH CHECK (true);
 
 -- ── user_settings ───────────────────────────────────────────
--- Users can read & update their own settings
 CREATE POLICY "Users can view own settings"
     ON public.user_settings FOR SELECT
     USING (auth.uid() = user_id);
@@ -333,7 +353,6 @@ CREATE POLICY "Users can update own settings"
     ON public.user_settings FOR UPDATE
     USING (auth.uid() = user_id);
 
--- Service role can do everything
 CREATE POLICY "Service role full access user_settings"
     ON public.user_settings FOR ALL
     USING (true) WITH CHECK (true);
@@ -341,10 +360,6 @@ CREATE POLICY "Service role full access user_settings"
 -- ============================================================
 -- PART 5: AUTO-CREATE PROFILE ON SIGNUP
 -- ============================================================
--- When a new user signs up via Supabase Auth, this trigger
--- automatically creates a row in the profiles table.
--- broker_verified is FALSE by default — users must verify
--- through the broker-connect screen to enable trading.
 
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
@@ -368,7 +383,6 @@ CREATE TRIGGER on_auth_user_created
 -- PART 6: SEED DATA (optional defaults)
 -- ============================================================
 
--- Default bot_state entries
 INSERT INTO public.bot_state (key, value)
 VALUES
     ('app_settings', '{"risk_percent": 5.0, "be_policy": "auto", "dry_run": false, "auto_compounding": false, "display_name": "Trader"}'),
@@ -398,3 +412,5 @@ ON CONFLICT (key) DO NOTHING;
 -- 3. Profiles auto-create on signup
 -- 4. Service role (your backend) has full access to everything
 -- 5. Users can only see their own data
+-- 6. CHECK constraints prevent bad data at the database level
+-- 7. updated_at columns auto-update via triggers
