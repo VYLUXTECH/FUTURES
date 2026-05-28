@@ -63,3 +63,7 @@ htmlcov/
 # Testing
 .pytest_cache/
 .idx/
+
+# Legacy ref files (keep local, don't commit)
+db.txt
+mt5.txt

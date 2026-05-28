@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="web/assets/images/logo.jpg" alt="FUTURES Logo" width="220">
+  <img src="web-app/public/logo.jpg" alt="FUTURES Logo" width="220">
 </p>
 
 <h1 align="center">FUTURES Trading Bot</h1>
@@ -88,7 +88,7 @@
 | **Database** | Supabase (PostgreSQL) • Row Level Security |
 | **AI Engine** | DeepSeek LLM • Qwen2.5-VL • Custom Workers AI endpoint |
 | **Trading** | MetaTrader 5 • HFM |
-| **Frontend** | Vanilla HTML / CSS / JavaScript (zero dependencies) |
+| **Frontend** | React 19 • Vite • TypeScript |
 | **Auth** | Supabase Auth • JWT • Encrypted credentials (Fernet) |
 | **Infra** | Cloudflare Tunnel • Windows VPS • NSSM |
 | **Admin** | Telegram Bot • Real-time health monitoring |
@@ -105,7 +105,7 @@ pip install -r backend/requirements.txt
 python backend/main.py
 ```
 
-> Edit `.env` first with your Supabase credentials and AI endpoint. Full setup guide in [`VPS-SETUP.md`](VPS-SETUP.md).
+> Edit `.env` first with your Supabase credentials and AI endpoint.
 
 ---
 
@@ -147,9 +147,9 @@ Users ── HTTPS ── Cloudflare Tunnel ── FastAPI ── Supabase
 FUTURES/
 ├── backend/          FastAPI server, auth API, AI copilot
 ├── brain/            Core trading engine (pipeline, risk, MT5)
-├── web/              Static frontend SPA
+├── web-app/          React + Vite + TypeScript frontend SPA
 ├── db.txt            Supabase SQL schema
-└── VPS-SETUP.md      Production deployment guide
+└── mt5.txt           MT5 setup reference
 ```
 
 ---
