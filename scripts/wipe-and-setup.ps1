@@ -1,7 +1,7 @@
 # Wipes C:\futures-bot / C:\futures, clones fresh, and runs local setup-vps.ps1 (with Cloudflare headless fix)
 # Run in PowerShell as Administrator
 $ROOT = "C:\futures"
-$REPO = "https://github.com/VYLUXTECHINC/FUTURES.git"
+$REPO = "https://github.com/VYLUXTECH/FUTURES.git"
 
 Set-Location C:\
 Remove-Item -Recurse -Force "C:\futures-bot" -ErrorAction SilentlyContinue

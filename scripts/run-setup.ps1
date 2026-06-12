@@ -10,5 +10,5 @@
 # Before running: delete any DNS A record for bot.futuretraders.net
 
 Set-ExecutionPolicy RemoteSigned -Scope Process -Force
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/VYLUXTECHINC/FUTURES/main/scripts/setup-vps.ps1" -OutFile "$env:TEMP\setup.ps1"
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/VYLUXTECH/FUTURES/main/scripts/setup-vps.ps1" -OutFile "$env:TEMP\setup.ps1"
 & "$env:TEMP\setup.ps1"

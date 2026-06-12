@@ -1,5 +1,6 @@
 Write-Host "=== Pulling latest changes ===" -ForegroundColor Yellow
 cd C:\futures
+git remote set-url origin https://github.com/VYLUXTECH/FUTURES.git 2>$null
 git pull
 
 Write-Host "`n=== Building frontend ===" -ForegroundColor Yellow

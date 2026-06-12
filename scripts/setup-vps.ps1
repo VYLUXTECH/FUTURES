@@ -8,7 +8,7 @@
 
 $ErrorActionPreference = "Stop"
 $ROOT = "C:\futures"
-$REPO = "https://github.com/VYLUXTECHINC/FUTURES.git"
+$REPO = "https://github.com/VYLUXTECH/FUTURES.git"
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "   FUTURES Trading Bot - VPS Setup" -ForegroundColor Cyan

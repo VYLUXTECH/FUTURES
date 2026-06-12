@@ -98,7 +98,7 @@
 ## <a id="quick-start"></a>Get Started in 30 Seconds
 
 ```bash
-git clone https://github.com/VYLUXTECHINC/FUTURES.git
+git clone https://github.com/VYLUXTECH/FUTURES.git
 cd FUTURES
 cp .env.example .env
 pip install -r backend/requirements.txt
