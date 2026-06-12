@@ -17,6 +17,7 @@ _MT5_PATHS = [
     r"C:\Program Files (x86)\MetaTrader 5\terminal64.exe",
     r"C:\Program Files\HFM MetaTrader 5\terminal64.exe",
     r"C:\Program Files (x86)\HFM MetaTrader 5\terminal64.exe",
+    r"C:\Program Files\HFM Metatrader 5\terminal64.exe",
     r"C:\Program Files\HFMT5\terminal64.exe",
 ]
 
