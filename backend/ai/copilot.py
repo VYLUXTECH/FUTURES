@@ -508,7 +508,8 @@ RESPOND naturally and conversationally. Do NOT output JSON or code unless callin
                     data = await resp.json()
                     if isinstance(data, str):
                         return data
-                    return (data.get("message", {}).get("content", "")
+                    return (data.get("result", "")
+                            or data.get("message", {}).get("content", "")
                             or data.get("response", "")
                             or data.get("text", "")
                             or str(data)[:500] or "Done.")
