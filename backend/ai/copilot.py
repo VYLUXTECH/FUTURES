@@ -31,6 +31,7 @@ from brain.db.supabase import (
 
 from backend.ai.market_summary import MarketSummaryEngine
 from backend.ai.chart_generator import ChartGenerator
+from backend.ai.tools import TOOL_DEFINITIONS
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +108,10 @@ DATE: {now} UTC
 {memory_text}{user_text}CURRENT MARKET CONDITIONS:
 {market_text or "Market data not yet available."}
 
-YOU HAVE TOOLS AVAILABLE. When the user asks for data or wants to change settings, respond with a tool call in this exact format:
+AVAILABLE TOOLS (use via TOOL_CALL format when user asks for data or wants to change settings):
+""" + "\n".join(f"- {t['name']}: {t['description']}" for t in TOOL_DEFINITIONS) + """
+
+When the user asks for data or wants to change settings, respond with a tool call in this exact format:
 TOOL_CALL: tool_name | arg1=val1 | arg2=val2
 
 RESPOND naturally and conversationally. Do NOT output JSON or code unless calling a tool."""
