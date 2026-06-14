@@ -54,17 +54,12 @@ class MT5NewsFilter:
                        id         TEXT PRIMARY KEY,
                        event_time TEXT NOT NULL,
                        currency   TEXT NOT NULL,
-                       event_name TEXT,
-                       importance INTEGER DEFAULT 3
+                       event_name TEXT
                    )"""
             )
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_time ON events (event_time)"
             )
-            try:
-                conn.execute("ALTER TABLE events ADD COLUMN importance INTEGER DEFAULT 3")
-            except Exception:
-                pass
             conn.commit()
 
     def refresh(self, hours_ahead: int = 4, force: bool = False) -> int:
@@ -118,8 +113,8 @@ class MT5NewsFilter:
                 importance_val = int(importance)
 
                 conn.execute(
-                    "INSERT OR REPLACE INTO events (id, event_time, currency, event_name, importance) VALUES (?,?,?,?,?)",
-                    (evt_id, evt_time.isoformat(), currency, evt_name, importance_val),
+                    "INSERT OR REPLACE INTO events (id, event_time, currency, event_name) VALUES (?,?,?,?)",
+                    (evt_id, evt_time.isoformat(), currency, evt_name),
                 )
                 count += 1
 
@@ -172,17 +167,20 @@ class MT5NewsFilter:
     def get_upcoming_events(self, hours_ahead: int = 4) -> list[dict]:
         now = datetime.now(timezone.utc)
         end = (now + timedelta(hours=hours_ahead)).isoformat()
-        with _news_conn() as conn:
-            rows = conn.execute(
-                """SELECT event_time, currency, event_name, importance
-                   FROM events WHERE event_time BETWEEN ? AND ?
-                   ORDER BY event_time ASC LIMIT 20""",
-                (now.isoformat(), end),
-            ).fetchall()
-        return [
-            {"time": r[0], "currency": r[1], "description": r[2], "importance": r[3]}
-            for r in rows
-        ]
+        try:
+            with _news_conn() as conn:
+                rows = conn.execute(
+                    """SELECT event_time, currency, event_name
+                       FROM events WHERE event_time BETWEEN ? AND ?
+                       ORDER BY event_time ASC LIMIT 20""",
+                    (now.isoformat(), end),
+                ).fetchall()
+            return [
+                {"time": r[0], "currency": r[1], "description": r[2]}
+                for r in rows
+            ]
+        except Exception:
+            return []
 
     def record_event_passed(self) -> None:
         now = datetime.now(timezone.utc)
