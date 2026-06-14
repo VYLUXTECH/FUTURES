@@ -17,14 +17,17 @@ except ImportError:
     mt5 = None
     MT5_AVAILABLE = False
 
+from brain.config.constants import SUPPORTED_PAIRS, MIN_RISK_PERCENT, MAX_RISK_PERCENT
 from brain.config.settings import AI_BASE_URL, AI_MODEL
-from brain.db.postgres import (
+from brain.db.supabase import (
+    get_state,
+    set_state,
+    get_all_mt5_credentials,
     get_open_trades,
     get_recent_trades,
     get_todays_pnl,
     count_trades_today,
 )
-from brain.db.supabase import get_state, set_state
 
 from backend.ai.market_summary import MarketSummaryEngine
 from backend.ai.chart_generator import ChartGenerator
@@ -34,15 +37,17 @@ logger = logging.getLogger(__name__)
 RATE_LIMIT_PER_MIN = 30
 CONFIRMATION_TIMEOUT = 120
 
+_SUPABASE_CLIENT: Any = None
+
+def _get_supabase():
+    global _SUPABASE_CLIENT
+    if _SUPABASE_CLIENT is None:
+        from backend.db.supabase import get_client
+        _SUPABASE_CLIENT = get_client()
+    return _SUPABASE_CLIENT
+
 
 class CopilotEngine:
-    """
-    AI Copilot — control interface for the autonomous trading brain.
-    - DeepSeek via custom AI endpoint
-    - Starts/stops the brain's trading loop
-    - Answers market questions using pre-computed summaries
-    - Does NOT execute individual trades (the brain's pipeline handles all entries/SL/TP)
-    """
 
     def __init__(
         self,
@@ -90,14 +95,44 @@ class CopilotEngine:
             items = [f"- {k}: {v}" for k, v in memories.items()]
             memory_text = "REMEMBERED ABOUT YOU:\n" + "\n".join(items) + "\n\n"
 
+        user_info = self._get_user_info(user_id)
+        user_text = ""
+        if user_info:
+            user_text = f"YOUR SETTINGS:\n- risk: {user_info.get('risk_percent', 5)}%\n- mode: {user_info.get('trading_mode', 'short')}\n- daily limit: {user_info.get('max_daily_trades', 5)}\n- compounding: {'on' if user_info.get('auto_compounding') else 'off'}\n- broker connected: {'yes' if user_info.get('broker_verified') else 'no'}\n\n"
+
         return f"""You are FUTURES — a trading bot that uses a proprietary strategy created by Richie Rich (the owner and strategy author). VYLUX TECH (the developer) implemented Richie Rich's ideas into code and made small improvements. Richie Rich and VYLUX TECH are different entities. You are calm, risk-aware, and brief (1-2 sentences). You NEVER promise returns or encourage excessive risk. You NEVER give financial advice — only analysis. If asked non-trading questions, politely refuse. Use the user's name if known.
 
 DATE: {now} UTC
 
-{memory_text}CURRENT MARKET CONDITIONS:
+{memory_text}{user_text}CURRENT MARKET CONDITIONS:
 {market_text or "Market data not yet available."}
 
-RESPOND naturally and conversationally. Do NOT output JSON or code."""
+YOU HAVE TOOLS AVAILABLE. When the user asks for data or wants to change settings, respond with a tool call in this exact format:
+TOOL_CALL: tool_name | arg1=val1 | arg2=val2
+
+RESPOND naturally and conversationally. Do NOT output JSON or code unless calling a tool."""
+
+    def _get_user_info(self, user_id: str) -> dict | None:
+        try:
+            sb = _get_supabase()
+            if not sb:
+                return None
+            profile = sb.table("profiles").select("*").eq("id", user_id).maybe_single().execute()
+            settings = sb.table("user_settings").select("*").eq("user_id", user_id).maybe_single().execute()
+            creds = sb.table("mt5_credentials").select("connected").eq("user_id", user_id).maybe_single().execute()
+            info = {}
+            if profile.data:
+                info["risk_percent"] = profile.data.get("risk_percent", 5)
+                info["auto_compounding"] = profile.data.get("auto_compounding", False)
+                info["broker_verified"] = profile.data.get("broker_verified", False)
+            if settings.data:
+                info["trading_mode"] = settings.data.get("trading_mode", "short")
+                info["max_daily_trades"] = settings.data.get("max_daily_trades", 5)
+            info["mt5_connected"] = bool(creds.data.get("connected")) if creds.data else False
+            return info
+        except Exception as exc:
+            logger.debug("Failed to fetch user info for %s: %s", user_id, exc)
+            return None
 
     # ── Rate Limiting ──────────────────────────────────────
 
@@ -111,9 +146,9 @@ RESPOND naturally and conversationally. Do NOT output JSON or code."""
             self._rate_store[user_id].append(now)
             return False
 
-    # ── Tool Handlers ──────────────────────────────────────
+    # ── Tool Dispatch ──────────────────────────────────────
 
-    async def _handle_tool(self, tool_name: str, args: dict) -> Any:
+    async def _handle_tool(self, tool_name: str, args: dict, user_id: str) -> Any:
         handlers: dict[str, Callable] = {
             "get_account_summary": self._tool_account_summary,
             "get_open_positions": self._tool_open_positions,
@@ -130,57 +165,47 @@ RESPOND naturally and conversationally. Do NOT output JSON or code."""
         if not handler:
             return {"error": f"Unknown tool: {tool_name}"}
         try:
-            result = await handler(args)
+            result = await handler(args, user_id)
             return result
         except Exception as exc:
-            logger.error("Tool %s error: %s", tool_name, exc)
+            logger.error("Tool %s error for user %s: %s", tool_name, user_id, exc)
             return {"error": str(exc)}
 
-    async def _tool_account_summary(self, _args: dict) -> dict:
-        if not MT5_AVAILABLE:
-            return {"error": "MT5 not available"}
-        loop = asyncio.get_event_loop()
-        account = await loop.run_in_executor(None, mt5.account_info)
-        balance = getattr(account, "balance", 0.0) if account else 0.0
-        equity = getattr(account, "equity", 0.0) if account else 0.0
-        margin = getattr(account, "margin", 0.0) if account else 0.0
-        trades_today = count_trades_today()
-        risk_pct = self._bot_state.get("risk_percent", 5.0)
+    async def _tool_account_summary(self, _args: dict, user_id: str) -> dict:
+        info = self._get_user_info(user_id)
+        trades_today = count_trades_today(user_id=user_id)
+        daily_limit = info.get("max_daily_trades", 5) if info else 5
+        bot_running = self._bot_state.get("running", False)
         return {
-            "balance": round(balance, 2),
-            "equity": round(equity, 2),
-            "margin": round(margin, 2),
-            "trades_remaining": 5 - trades_today,
-            "daily_used": trades_today,
-            "daily_limit": self._bot_state.get("daily_limit", 5),
-            "bot_active": self._bot_state.get("running", False),
-            "risk_percent": risk_pct,
+            "trades_today": trades_today,
+            "trades_remaining": max(0, daily_limit - trades_today),
+            "daily_limit": daily_limit,
+            "bot_active": bot_running,
+            "risk_percent": info.get("risk_percent", 5) if info else 5,
+            "trading_mode": info.get("trading_mode", "short") if info else "short",
+            "mt5_connected": info.get("mt5_connected", False) if info else False,
+            "broker_verified": info.get("broker_verified", False) if info else False,
         }
 
-    async def _tool_open_positions(self, _args: dict) -> list:
-        if not MT5_AVAILABLE:
-            return []
-        positions = await asyncio.get_event_loop().run_in_executor(None, mt5.positions_get)
-        if not positions:
-            return []
-        result = []
-        for p in positions:
-            result.append({
-                "ticket": int(p.ticket),
-                "symbol": p.symbol,
-                "direction": "BUY" if p.type == mt5.ORDER_TYPE_BUY else "SELL",
-                "volume": p.volume,
-                "entry": p.price_open,
-                "current_price": p.price_current,
-                "profit": round(p.profit, 2),
-                "sl": p.sl,
-                "tp": p.tp,
-            })
-        return result
+    async def _tool_open_positions(self, _args: dict, user_id: str) -> list:
+        trades = get_open_trades(user_id=user_id)
+        return [
+            {
+                "ticket": t.get("ticket", 0),
+                "symbol": t.get("pair", ""),
+                "direction": t.get("direction", ""),
+                "entry": t.get("entry_price", 0),
+                "sl": t.get("sl_price", 0),
+                "tp": t.get("tp_price", 0),
+                "profit": round(t.get("pnl", 0), 2) if t.get("pnl") else 0,
+                "opened_at": t.get("opened_at", ""),
+            }
+            for t in trades
+        ]
 
-    async def _tool_recent_trades(self, args: dict) -> list:
+    async def _tool_recent_trades(self, args: dict, user_id: str) -> list:
         limit = min(args.get("limit", 5), 20)
-        trades = get_recent_trades(limit=limit)
+        trades = get_recent_trades(limit=limit, user_id=user_id)
         return [
             {
                 "symbol": t.get("pair", ""),
@@ -194,15 +219,15 @@ RESPOND naturally and conversationally. Do NOT output JSON or code."""
             for t in trades
         ]
 
-    async def _tool_market_summary(self, args: dict) -> dict:
+    async def _tool_market_summary(self, args: dict, _user_id: str) -> dict:
         symbol = args.get("symbol", "").upper()
         summary = self.market_summary.get_summary(symbol)
         if not summary:
             return {"error": f"No market data for {symbol}"}
         return summary
 
-    async def _tool_explain_last_trade(self, _args: dict) -> dict:
-        trades = get_recent_trades(limit=1)
+    async def _tool_explain_last_trade(self, _args: dict, user_id: str) -> dict:
+        trades = get_recent_trades(limit=1, user_id=user_id)
         if not trades:
             return {"message": "No trades have been executed yet."}
         t = trades[0]
@@ -222,7 +247,7 @@ RESPOND naturally and conversationally. Do NOT output JSON or code."""
             "reason": reason,
         }
 
-    async def _tool_generate_chart(self, args: dict) -> dict:
+    async def _tool_generate_chart(self, args: dict, _user_id: str) -> dict:
         symbol = args.get("symbol", "").upper()
         tf = args.get("timeframe", "15m")
         path = await asyncio.get_event_loop().run_in_executor(
@@ -232,7 +257,7 @@ RESPOND naturally and conversationally. Do NOT output JSON or code."""
             return {"image_path": path, "message": f"Chart generated for {symbol} ({tf})."}
         return {"error": "Failed to generate chart. Ensure mplfinance is installed."}
 
-    async def _tool_news_status(self, _args: dict) -> dict:
+    async def _tool_news_status(self, _args: dict, _user_id: str) -> dict:
         try:
             from brain.core.news_volatility import MT5NewsFilter
             filter = MT5NewsFilter()
@@ -246,28 +271,24 @@ RESPOND naturally and conversationally. Do NOT output JSON or code."""
             }
         except Exception as exc:
             logger.warning("News status error: %s", exc)
-            return {"news_paused": False, "upcoming_events": [], "status": f"News check unavailable"}
+            return {"news_paused": False, "upcoming_events": [], "status": "News check unavailable"}
 
-    async def _tool_bot_health(self, _args: dict) -> dict:
-        if not MT5_AVAILABLE:
-            return {"mt5_connected": False, "bot_running": False, "cooldown_active": False, "healthy": False}
-        loop = asyncio.get_event_loop()
-        terminal = await loop.run_in_executor(None, mt5.terminal_info)
-        connected = terminal is not None and bool(terminal.connected)
-        risk = self._bot_state.get("risk")
-        cooldown_active = bool(risk and getattr(risk, "in_cooldown", False)) if risk else False
+    async def _tool_bot_health(self, _args: dict, user_id: str) -> dict:
+        info = self._get_user_info(user_id)
+        mt5_ok = info.get("mt5_connected", False) if info else False
+        bot_running = self._bot_state.get("running", False)
         return {
-            "mt5_connected": connected,
-            "bot_running": self._bot_state.get("running", False),
-            "cooldown_active": cooldown_active,
-            "healthy": connected and self._bot_state.get("running", False) and not cooldown_active,
+            "mt5_connected": mt5_ok,
+            "bot_running": bot_running,
+            "broker_verified": info.get("broker_verified", False) if info else False,
+            "healthy": mt5_ok and bot_running,
         }
 
-    async def _tool_daily_pnl(self, _args: dict) -> dict:
-        pnl = get_todays_pnl()
+    async def _tool_daily_pnl(self, _args: dict, user_id: str) -> dict:
+        pnl = get_todays_pnl(user_id=user_id)
         return {"pnl": round(pnl, 2)}
 
-    async def _tool_trading_strategy(self, _args: dict) -> dict:
+    async def _tool_trading_strategy(self, _args: dict, _user_id: str) -> dict:
         return {
             "strategy": "Pure price action – no indicators",
             "sectors": [
@@ -281,8 +302,8 @@ RESPOND naturally and conversationally. Do NOT output JSON or code."""
                 "Bias synthesizer with confidence scoring",
             ],
             "risk_reward": "Fixed 1:3 R:R ratio",
-            "pairs": ["GBPUSD", "GBPJPY", "USDJPY"],
-            "session": "10:00-20:00 EAT",
+            "pairs": SUPPORTED_PAIRS,
+            "session": "06:00-20:00 UTC",
         }
 
     # ── Confirmation Flow ──────────────────────────────────
@@ -326,39 +347,71 @@ RESPOND naturally and conversationally. Do NOT output JSON or code."""
             return await self._execute_toggle_compound(args, user_id)
         return {"reply": f"Unknown action: {action_type}"}
 
-    async def _execute_start_trading(self, _args: dict, _user_id: str) -> dict:
-        risk = self._bot_state.get("risk")
-        if risk and getattr(risk, "in_cooldown", False):
-            return {"reply": "Brain is in cooldown. Cannot trade until it expires."}
+    async def _update_profile(self, user_id: str, updates: dict) -> bool:
+        try:
+            sb = _get_supabase()
+            if not sb:
+                return False
+            sb.table("profiles").update(updates).eq("id", user_id).execute()
+            return True
+        except Exception as exc:
+            logger.warning("Failed to update profile for %s: %s", user_id, exc)
+            return False
+
+    async def _upsert_user_settings(self, user_id: str, updates: dict) -> bool:
+        try:
+            sb = _get_supabase()
+            if not sb:
+                return False
+            data = {"user_id": user_id, **updates}
+            sb.table("user_settings").upsert(data, on_conflict="user_id").execute()
+            return True
+        except Exception as exc:
+            logger.warning("Failed to update user_settings for %s: %s", user_id, exc)
+            return False
+
+    async def _execute_start_trading(self, _args: dict, user_id: str) -> dict:
         self._bot_state["running"] = True
-        return {"reply": "Trading started. The brain is now analysing and executing trades autonomously."}
+        await self._update_profile(user_id, {"bot_active": True})
+        return {"reply": "Trading started. The brain is now analysing and executing trades for all connected users."}
 
-    async def _execute_stop_trading(self, _args: dict, _user_id: str) -> dict:
+    async def _execute_stop_trading(self, _args: dict, user_id: str) -> dict:
         self._bot_state["running"] = False
-        return {"reply": "Trading stopped."}
+        await self._update_profile(user_id, {"bot_active": False})
+        return {"reply": "Trading stopped for all users."}
 
-    async def _execute_set_risk(self, args: dict, _user_id: str) -> dict:
+    async def _execute_set_risk(self, args: dict, user_id: str) -> dict:
         value = float(args.get("value", 5))
         value = max(MIN_RISK_PERCENT, min(MAX_RISK_PERCENT, value))
-        self._bot_state["risk_percent"] = value
-        return {"reply": f"Risk set to {value}%."}
+        ok = await self._update_profile(user_id, {"risk_percent": value})
+        if ok:
+            return {"reply": f"Risk set to {value}% per trade."}
+        return {"reply": "Failed to save risk setting. Try again."}
 
-    async def _execute_set_mode(self, args: dict, _user_id: str) -> dict:
+    async def _execute_set_mode(self, args: dict, user_id: str) -> dict:
         mode = args.get("mode", "long")
-        self._bot_state["mode"] = mode
-        return {"reply": f"Mode set to {mode}."}
+        ok = await self._upsert_user_settings(user_id, {"trading_mode": mode})
+        if ok:
+            return {"reply": f"Trading mode set to {mode}."}
+        return {"reply": "Failed to save mode. Try again."}
 
-    async def _execute_set_daily_limit(self, args: dict, _user_id: str) -> dict:
+    async def _execute_set_daily_limit(self, args: dict, user_id: str) -> dict:
         value = int(args.get("value", 5))
-        value = max(1, min(5, value))
-        self._bot_state["daily_limit"] = value
-        return {"reply": f"Daily limit set to {value}."}
+        value = max(1, min(20, value))
+        ok = await self._upsert_user_settings(user_id, {"max_daily_trades": value})
+        if ok:
+            return {"reply": f"Daily trade limit set to {value}."}
+        return {"reply": "Failed to save daily limit. Try again."}
 
-    async def _execute_toggle_compound(self, _args: dict, _user_id: str) -> dict:
-        current = self._bot_state.get("auto_compounding", False)
-        self._bot_state["auto_compounding"] = not current
-        status = "enabled" if not current else "disabled"
-        return {"reply": f"Auto-compounding {status}."}
+    async def _execute_toggle_compound(self, _args: dict, user_id: str) -> dict:
+        info = self._get_user_info(user_id)
+        current = info.get("auto_compounding", False) if info else False
+        new_val = not current
+        ok = await self._update_profile(user_id, {"auto_compounding": new_val})
+        status = "enabled" if new_val else "disabled"
+        if ok:
+            return {"reply": f"Auto-compounding {status}."}
+        return {"reply": "Failed to toggle compounding. Try again."}
 
     # ── Chat ───────────────────────────────────────────────
 
@@ -395,11 +448,33 @@ RESPOND naturally and conversationally. Do NOT output JSON or code."""
 
         reply = await self._call_llm(messages)
 
+        tool_result = await self._try_handle_tool_call(reply, user_id)
+        if tool_result is not None:
+            reply = tool_result
+
         async with self._conv_lock:
             self._conversations[user_id].append({"role": "assistant", "content": reply})
             set_state(f"conversation:{user_id}", self._conversations[user_id])
 
         return {"reply": reply}
+
+    async def _try_handle_tool_call(self, reply: str, user_id: str) -> str | None:
+        if not reply.startswith("TOOL_CALL:"):
+            return None
+        parts = reply[len("TOOL_CALL:"):].strip().split("|")
+        tool_name = parts[0].strip()
+        args = {}
+        for p in parts[1:]:
+            if "=" in p:
+                k, v = p.split("=", 1)
+                args[k.strip()] = v.strip()
+        if tool_name in ("start_trading", "stop_trading", "toggle_auto_compounding"):
+            conf_id = await self.request_confirmation(user_id, {"tool": tool_name, "args": args})
+            return f"I'll need your confirmation. Please reply with your confirmation ID: {conf_id}"
+        result = await self._handle_tool(tool_name, args, user_id)
+        if isinstance(result, dict):
+            return json.dumps(result, indent=2)
+        return str(result)
 
     async def _call_llm(
         self,
