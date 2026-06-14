@@ -249,6 +249,22 @@ def _run_user_cycle(user: dict) -> None:
             break
 
 
+def _refresh_account_info(user: dict) -> None:
+    """Quick connect, read balance/equity, disconnect. Does NOT trade."""
+    user_id = user["user_id"]
+    login = user["login"]
+    password = user["password"]
+    server = user["server"]
+    if connect_user_account(login, password, server):
+        info = mt5.account_info()
+        balance = getattr(info, "balance", 0.0) if info else 0.0
+        equity = getattr(info, "equity", 0.0) if info else 0.0
+        _bot_state[f"acct:{user_id}"] = {"balance": balance, "equity": equity}
+    else:
+        _bot_state[f"acct:{user_id}"] = {"balance": 0, "equity": 0}
+    mt5.shutdown()
+
+
 def trading_loop() -> None:
     logger.info("Multi-user trading thread started")
     _bot_state["running"] = True
@@ -260,29 +276,27 @@ def trading_loop() -> None:
             _stop_event.wait(timeout=1)
             continue
 
-        utc_now = datetime.now(timezone.utc)
-        if utc_now.weekday() >= 5:
-            _stop_event.wait(timeout=60)
-            continue
-        if utc_now.hour < SESSION_START_UTC or utc_now.hour >= SESSION_END_UTC:
-            _stop_event.wait(timeout=60)
-            continue
-
         users = get_all_mt5_credentials(SUPABASE_DB_URI)
         if not users:
             logger.debug("No MT5 credentials found — waiting for users to register")
             _stop_event.wait(timeout=30)
             continue
 
+        utc_now = datetime.now(timezone.utc)
+        can_trade = utc_now.weekday() < 5 and SESSION_START_UTC <= utc_now.hour < SESSION_END_UTC
+
         for user in users:
             if _stop_event.is_set() or not _bot_state.get("running"):
                 break
-            try:
-                _run_user_cycle(user)
-            except Exception as exc:
-                logger.error("User cycle error for %s: %s", user.get("user_id"), exc, exc_info=True)
-            finally:
-                mt5.shutdown()
+            if can_trade:
+                try:
+                    _run_user_cycle(user)
+                except Exception as exc:
+                    logger.error("User cycle error for %s: %s", user.get("user_id"), exc, exc_info=True)
+                finally:
+                    mt5.shutdown()
+            else:
+                _refresh_account_info(user)
 
         _stop_event.wait(timeout=SCAN_INTERVAL_SECS)
 
