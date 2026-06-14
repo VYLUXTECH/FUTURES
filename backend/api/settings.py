@@ -167,13 +167,28 @@ async def save_mt5_credentials(req: MT5CredentialsUpdate, user: dict = Depends(r
         return {"error": "not authenticated"}
     if not req.login or not req.password:
         return {"error": "login and password required"}
+    if not req.server:
+        return {"error": "server is required"}
     try:
+        is_demo = "demo" in req.server.lower()
+        account_type = "demo" if is_demo else "real"
+
+        existing = client.table("mt5_credentials").select("server").eq("user_id", user_id).execute()
+        if existing.data:
+            same_type = [
+                e for e in existing.data
+                if ("demo" in (e.get("server") or "").lower()) == is_demo
+                and (e.get("server") or "") != req.server
+            ]
+            if same_type:
+                return {"error": f"You can only connect one {account_type} account. Disconnect the existing one first."}
+
         from brain.utils.crypto import encrypt_password
         data: dict[str, Any] = {
             "user_id": user_id,
             "login": req.login,
             "password": encrypt_password(req.password),
-            "server": req.server or "",
+            "server": req.server,
         }
         client.table("mt5_credentials").upsert(data, on_conflict="user_id, login, server").execute()
         return {"status": "saved"}
