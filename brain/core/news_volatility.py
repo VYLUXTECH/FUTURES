@@ -9,6 +9,8 @@ from typing import Generator
 
 import MetaTrader5 as mt5
 
+from pathlib import Path
+
 from brain.config.constants import (
     COUNTRY_CURRENCY_MAP,
     NEWS_IMPORTANCE_HIGH,
@@ -16,6 +18,9 @@ from brain.config.constants import (
     SQLITE_NEWS_DB,
     POST_NEWS_COOLDOWN_MINUTES,
 )
+
+_NEWS_DB_PATH: str = str(Path(__file__).resolve().parent.parent / SQLITE_NEWS_DB)
+Path(_NEWS_DB_PATH).parent.mkdir(parents=True, exist_ok=True)
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +31,7 @@ _NEWS_LOCK = threading.Lock()
 
 @contextmanager
 def _news_conn() -> Generator[sqlite3.Connection, None, None]:
-    conn = sqlite3.connect(SQLITE_NEWS_DB, check_same_thread=False, timeout=10)
+    conn = sqlite3.connect(_NEWS_DB_PATH, check_same_thread=False, timeout=10)
     conn.execute("PRAGMA journal_mode=WAL")
     try:
         yield conn
