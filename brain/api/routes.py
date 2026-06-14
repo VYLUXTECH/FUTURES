@@ -376,13 +376,12 @@ async def mt5_connect(req: MT5ConnectRequest, user: dict = Depends(require_auth)
 
     def _test_connection() -> dict:
         mt5.shutdown()
-        from brain.utils.mt5_helper import _find_mt5_path
-        mt5_path = _find_mt5_path()
-        init_kwargs = {"login": int(login_to_use), "password": password_to_use, "server": server_to_use}
-        if mt5_path:
-            init_kwargs["path"] = mt5_path
         try:
-            ok = mt5.initialize(**init_kwargs)
+            ok = mt5.initialize(
+                login=int(login_to_use),
+                password=password_to_use,
+                server=server_to_use,
+            )
             if not ok:
                 err = mt5.last_error()
                 mt5.shutdown()
