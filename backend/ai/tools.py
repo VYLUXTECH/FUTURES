@@ -134,7 +134,25 @@ TOOL_DEFINITIONS: list[dict] = [
         "description": "Start the bot's autonomous trading engine. The brain runs the full 8-sector pipeline and handles all trade decisions (entry, SL, TP) automatically.",
         "parameters": {
             "type": "object",
-            "properties": {},
+            "properties": {
+                "trade_count": {
+                    "type": "integer",
+                    "description": "Number of trades to execute this session (1-10). If not set, defaults to 1.",
+                    "minimum": 1,
+                    "maximum": 10,
+                },
+                "mode": {
+                    "type": "string",
+                    "description": "Trading mode (short for single trades, long for multiple concurrent trades).",
+                    "enum": ["short", "long"],
+                },
+                "risk_percent": {
+                    "type": "number",
+                    "description": "Risk percentage per trade (1-10).",
+                    "minimum": 1,
+                    "maximum": 10,
+                },
+            },
             "additionalProperties": False,
             "required": [],
         },

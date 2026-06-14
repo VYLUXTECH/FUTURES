@@ -132,6 +132,7 @@ RESPOND naturally and conversationally. Do NOT output JSON or code unless callin
             if settings.data:
                 info["trading_mode"] = settings.data.get("trading_mode", "short")
                 info["max_daily_trades"] = settings.data.get("max_daily_trades", 5)
+                info["trade_count"] = settings.data.get("trade_count", 1)
             info["mt5_connected"] = bool(creds.data.get("connected")) if creds.data else False
             return info
         except Exception as exc:
@@ -374,7 +375,22 @@ RESPOND naturally and conversationally. Do NOT output JSON or code unless callin
             logger.warning("Failed to update user_settings for %s: %s", user_id, exc)
             return False
 
-    async def _execute_start_trading(self, _args: dict, user_id: str) -> dict:
+    async def _execute_start_trading(self, args: dict, user_id: str) -> dict:
+        trade_count = args.get("trade_count")
+        if trade_count is not None:
+            trade_count = max(1, min(10, int(trade_count)))
+            self._bot_state["trade_count"] = trade_count
+            await self._upsert_user_settings(user_id, {"trade_count": trade_count})
+
+        mode = args.get("mode")
+        if mode:
+            await self._upsert_user_settings(user_id, {"trading_mode": mode})
+
+        risk_pct = args.get("risk_percent")
+        if risk_pct is not None:
+            risk_pct = max(1, min(10, float(risk_pct)))
+            await self._update_profile(user_id, {"risk_percent": risk_pct})
+
         self._bot_state["running"] = True
         await self._update_profile(user_id, {"bot_active": True})
         return {"reply": "Trading started. The brain is now analysing and executing trades for all connected users."}

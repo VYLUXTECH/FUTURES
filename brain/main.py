@@ -171,6 +171,7 @@ def _run_user_cycle(user: dict) -> None:
     risk_percent = None
     trading_mode = "short"
     auto_compound = False
+    trade_count = 1
     try:
         from brain.db.supabase import _get_conn
         conn = _get_conn(SUPABASE_DB_URI)
@@ -181,6 +182,11 @@ def _run_user_cycle(user: dict) -> None:
                 risk_percent = float(row[0]) if row[0] is not None else None
                 trading_mode = row[1] or "short"
                 auto_compound = bool(row[2]) if row[2] is not None else False
+        with conn, conn.cursor() as cur:
+            cur.execute("SELECT trade_count FROM user_settings WHERE user_id = %s", (user_id,))
+            row = cur.fetchone()
+            if row and row[0] is not None:
+                trade_count = int(row[0])
         conn.close()
     except Exception:
         pass
@@ -224,7 +230,6 @@ def _run_user_cycle(user: dict) -> None:
     if not signals:
         return
 
-    trade_count = _bot_state.get("trade_count", 1)
     trades_placed = 0
 
     for signal in signals:
