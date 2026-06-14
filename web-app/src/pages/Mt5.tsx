@@ -5,10 +5,30 @@ import type { NavigateFn } from '../App';
 
 interface Props { navigate: NavigateFn; }
 
+const HFM_SERVERS = [
+  'HFMarketsGlobal-Demo',
+  'HFMarketsGlobal-Live',
+  'HFMarketsGlobal-Live1',
+  'HFMarketsGlobal-Live2',
+  'HFMarketsGlobal-Live3',
+  'HFMarketsGlobal-Live4',
+  'HFMarketsGlobal-Live5',
+  'HFMarketsEU-Demo',
+  'HFMarketsEU-Live',
+  'HFMarketsUK-Demo',
+  'HFMarketsUK-Demo2',
+  'HFMarketsUK-Live',
+  'HFMarketsUK-Live2',
+  'hfm-demo',
+];
+
+const OTHER_SERVER = '__other__';
+
 export default function Mt5(_props: Props) {
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [server, setServer] = useState('');
+  const [customServer, setCustomServer] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<Mt5ConnectResult | null>(null);
@@ -24,12 +44,13 @@ export default function Mt5(_props: Props) {
 
   async function handleConnect(e: React.FormEvent) {
     e.preventDefault();
-    if (!login || !password || !server.trim()) { showMsg('Please fill in all fields.', 'error'); return; }
+    const serverToUse = server === OTHER_SERVER ? customServer.trim() : server;
+    if (!login || !password || !serverToUse) { showMsg('Please fill in all fields.', 'error'); return; }
     setLoading(true); setResult(null); setToast(null);
     try {
-      const saveData = await saveMt5Credentials(login, password, server.trim());
+      const saveData = await saveMt5Credentials(login, password, serverToUse);
       if (saveData.error) { showMsg('Failed to save: ' + saveData.error, 'error'); setLoading(false); return; }
-      const connectResult = await testMt5Connection(login, password, server.trim());
+      const connectResult = await testMt5Connection(login, password, serverToUse);
       setResult(connectResult);
       if (connectResult.connected) {
         showMsg('Connected! Auto trading: ' + (connectResult.automated_trading_enabled ? 'Enabled' : 'Disabled'), connectResult.automated_trading_enabled ? 'success' : 'info');
@@ -70,8 +91,15 @@ export default function Mt5(_props: Props) {
           </div>
           <div className="form-group">
             <label>MT5 Server</label>
-            <input className="form-input" value={server} onChange={(e) => setServer(e.target.value)}
-              placeholder="e.g. Exness-Real, HFM-Demo" required />
+            <select className="form-input" value={server} onChange={(e) => setServer(e.target.value)} required>
+              <option value="">— Select server —</option>
+              {HFM_SERVERS.map((s) => <option key={s} value={s}>{s}</option>)}
+              <option value={OTHER_SERVER}>Other (manual)</option>
+            </select>
+            {server === OTHER_SERVER && (
+              <input className="form-input" style={{ marginTop: '0.5rem' }} value={customServer}
+                onChange={(e) => setCustomServer(e.target.value)} placeholder="Type server name..." required />
+            )}
           </div>
           <button type="submit" className="btn-primary" disabled={loading}>
             {loading && <span className="spinner" />}
