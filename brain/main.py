@@ -17,6 +17,7 @@ from brain.core.risk import RiskEngine
 from brain.data.feed import get_candles
 from brain.db import get_open_trades, get_user_max_daily_trades
 from brain.api.routes import set_bot_state_ref
+from brain.db.supabase import set_state
 from brain.utils.mt5_helper import reconnect_mt5, is_connected
 from brain.utils.logger import setup_logging
 
@@ -152,6 +153,7 @@ def _run_user_cycle(user: dict) -> None:
     balance = getattr(account_info, "balance", 0.0) if account_info else 0.0
     equity = getattr(account_info, "equity", 0.0) if account_info else 0.0
     _bot_state[f"acct:{user_id}"] = {"balance": balance, "equity": equity}
+    set_state(f"balance:{user_id}", {"balance": balance, "equity": equity})
 
     try:
         from brain.core.news_volatility import MT5NewsFilter
@@ -266,6 +268,7 @@ def _refresh_account_info(user: dict) -> None:
         balance = getattr(info, "balance", 0.0) if info else 0.0
         equity = getattr(info, "equity", 0.0) if info else 0.0
         _bot_state[f"acct:{user_id}"] = {"balance": balance, "equity": equity}
+        set_state(f"balance:{user_id}", {"balance": balance, "equity": equity})
         try:
             from brain.core.news_volatility import MT5NewsFilter
             MT5NewsFilter().refresh(hours_ahead=8, force=False)
@@ -273,6 +276,7 @@ def _refresh_account_info(user: dict) -> None:
             pass
     elif f"acct:{user_id}" not in _bot_state:
         _bot_state[f"acct:{user_id}"] = {"balance": 0, "equity": 0}
+        set_state(f"balance:{user_id}", {"balance": 0, "equity": 0})
     mt5.shutdown()
 
 

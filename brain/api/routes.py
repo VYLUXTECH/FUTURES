@@ -108,6 +108,16 @@ async def bot_status(user: dict = Depends(require_auth)) -> BotStatusResponse:
     balance: float = acct.get("balance", 0.0)
     equity: float  = acct.get("equity", 0.0)
 
+    if not acct:
+        try:
+            from brain.db.supabase import get_state
+            saved = get_state(f"balance:{user_id}")
+            if saved:
+                balance = saved.get("balance", 0.0)
+                equity = saved.get("equity", 0.0)
+        except Exception:
+            pass
+
     risk = _bot_state.get("risk")
     cooldown = bool(risk and risk.in_cooldown) if risk else False
 
@@ -167,6 +177,16 @@ async def dashboard(user: dict = Depends(require_auth)) -> dict:
     acct = _bot_state.get(f"acct:{user_id}", {})
     balance = acct.get("balance", 0.0)
     equity  = acct.get("equity", 0.0)
+
+    if not acct:
+        try:
+            from brain.db.supabase import get_state
+            saved = get_state(f"balance:{user_id}")
+            if saved:
+                balance = saved.get("balance", 0.0)
+                equity = saved.get("equity", 0.0)
+        except Exception:
+            pass
 
     return {
         "balance":       balance,
@@ -433,10 +453,11 @@ async def mt5_connect(req: MT5ConnectRequest, user: dict = Depends(require_auth)
 
     user_id = user.get("sub")
     if result.get("connected") and result.get("account"):
-        _bot_state[f"acct:{user_id}"] = {
-            "balance": result["account"]["balance"],
-            "equity":  result["account"]["equity"],
-        }
+        bal = result["account"]["balance"]
+        eq = result["account"]["equity"]
+        _bot_state[f"acct:{user_id}"] = {"balance": bal, "equity": eq}
+        from brain.db.supabase import set_state
+        set_state(f"balance:{user_id}", {"balance": bal, "equity": eq})
 
     logger.info(
         "MT5 connect test | status=%s | login=%s | ea=%s",
