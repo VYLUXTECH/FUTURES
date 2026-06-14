@@ -36,7 +36,8 @@ class TradeDecision(NamedTuple):
 
 class RiskEngine:
 
-    def __init__(self, max_daily_trades: int | None = None) -> None:
+    def __init__(self, max_daily_trades: int | None = None, user_id: str | None = None) -> None:
+        self.user_id: str | None = user_id
         self.news_filter = MT5NewsFilter()
 
         self.daily_start_balance: float = 0.0
@@ -51,8 +52,11 @@ class RiskEngine:
 
         self._restore_state()
 
+    def _cooldown_key(self) -> str:
+        return f"cooldown_until:{self.user_id}" if self.user_id else "cooldown_until"
+
     def _restore_state(self) -> None:
-        cd_until_iso = get_state("cooldown_until")
+        cd_until_iso = get_state(self._cooldown_key())
         if cd_until_iso:
             try:
                 until = datetime.fromisoformat(cd_until_iso)
@@ -61,12 +65,12 @@ class RiskEngine:
                 if until > datetime.now(timezone.utc):
                     self.in_cooldown = True
                     self.cooldown_until = until
-                    logger.info("Cooldown restored until %s", until.isoformat())
+                    logger.info("Cooldown restored for user %s until %s", self.user_id, until.isoformat())
             except ValueError:
                 pass
 
     def _persist_cooldown(self, until: datetime) -> None:
-        set_state("cooldown_until", until.isoformat())
+        set_state(self._cooldown_key(), until.isoformat())
 
     def maybe_reset_daily(self, current_balance: float) -> None:
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -74,7 +78,8 @@ class RiskEngine:
             self._last_reset_date = today
             self.daily_start_balance = current_balance
             logger.info(
-                "Daily reset | date=%s | balance=%.2f", today, current_balance
+                "Daily reset | user=%s | date=%s | balance=%.2f",
+                self.user_id, today, current_balance,
             )
 
     def allow_trade(
@@ -102,13 +107,13 @@ class RiskEngine:
                     f"Daily drawdown limit reached ({drawdown:.1%} >= {DAILY_DRAWDOWN_LIMIT:.0%})",
                 )
 
-        trades_today = count_trades_today()
+        trades_today = count_trades_today(user_id=self.user_id)
         if trades_today >= self.max_daily_trades:
             return TradeDecision(
                 False, f"Max daily trades reached ({trades_today}/{self.max_daily_trades})"
             )
 
-        losses_24h = count_losses_last_24h()
+        losses_24h = count_losses_last_24h(user_id=self.user_id)
         if losses_24h >= 3:
             self._trigger_cooldown(reason=f"{losses_24h} losses in 24h")
             return TradeDecision(False, f"3-loss cooldown triggered ({losses_24h} losses)")

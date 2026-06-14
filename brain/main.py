@@ -26,11 +26,8 @@ logger = logging.getLogger("futuresbrain.main")
 _stop_event = threading.Event()
 _bot_state: dict = {
     "running": False,
-    "risk": None,
-    "risk_percent": None,
     "start_time": None,
     "trading_thread": None,
-    "_init_mt5": None,
     "_start_trading": None,
 }
 
@@ -39,85 +36,21 @@ SCAN_INTERVAL_SECS = 60
 MONITOR_INTERVAL_SECS = 15
 
 
-def _fetch_mt5_creds_from_supabase() -> tuple[int, str, str] | None:
-    if not SUPABASE_DB_URI:
-        return None
-    try:
-        from brain.db.supabase import _get_conn
-        from brain.utils.crypto import decrypt_password
-        conn = _get_conn(SUPABASE_DB_URI)
-        with conn, conn.cursor() as cur:
-            cur.execute(
-                "SELECT login, password, server FROM mt5_credentials ORDER BY updated_at DESC LIMIT 1"
-            )
-            row = cur.fetchone()
-        conn.close()
-        if row:
-            login = int(row[0])
-            password = row[1]
-            try:
-                password = decrypt_password(password)
-            except Exception:
-                pass
-            return (login, password, row[2])
-    except Exception as exc:
-        logger.warning("Failed to fetch MT5 creds from Supabase: %s", exc)
-    return None
-
-
-def get_mt5_creds() -> tuple[int, str, str]:
-    supabase_creds = _fetch_mt5_creds_from_supabase()
-    if supabase_creds:
-        return supabase_creds
-    return (0, "", "")
-
-
-def init_mt5(
-    login: int | None = None,
-    password: str | None = None,
-    server: str | None = None,
-) -> bool:
-    if login and password and server:
-        ok = reconnect_mt5(login, password, server, max_retries=5)
-    else:
-        _login, _password, _server = get_mt5_creds()
-        # Check for pending account switch (set by /api/mt5/switch)
-        pending_login = _bot_state.get("pending_mt5_login")
-        pending_server = _bot_state.get("pending_mt5_server")
-        if pending_login and pending_server:
-            _login = pending_login
-            _server = pending_server
-            try:
-                from brain.db.supabase import _get_conn
-                from brain.utils.crypto import decrypt_password
-                conn = _get_conn(SUPABASE_DB_URI)
-                with conn, conn.cursor() as cur:
-                    cur.execute(
-                        "SELECT password FROM mt5_credentials WHERE login = %s AND server = %s ORDER BY updated_at DESC LIMIT 1",
-                        (_login, _server),
-                    )
-                    row = cur.fetchone()
-                conn.close()
-                if row:
-                    try:
-                        _password = decrypt_password(row[0])
-                    except Exception:
-                        _password = row[0]
-            except Exception as exc:
-                logger.warning("Failed to fetch pending account password: %s", exc)
-            _bot_state.pop("pending_mt5_login", None)
-            _bot_state.pop("pending_mt5_server", None)
-            logger.info("Switched MT5 account: login=%s | server=%s", _login, _server)
-        if not _login:
-            logger.error("No MT5 credentials available (env or Supabase)")
-            return False
-        ok = reconnect_mt5(_login, _password, _server, max_retries=5)
-    if ok:
-        for pair in SUPPORTED_PAIRS:
+def _select_symbols() -> None:
+    for pair in SUPPORTED_PAIRS:
+        try:
             mt5.symbol_select(pair, True)
+        except Exception:
+            pass
+
+
+def connect_user_account(login: int, password: str, server: str) -> bool:
+    ok = reconnect_mt5(login, password, server, max_retries=3)
+    if ok:
+        _select_symbols()
         account = mt5.account_info()
         if account and not getattr(account, "trade_allowed", True):
-            logger.warning("Automated trading is DISABLED in MT5 — bot will not trade")
+            logger.warning("Automated trading DISABLED for account %s", login)
     return ok
 
 
@@ -163,8 +96,8 @@ def count_open_positions() -> int:
         return len(get_open_trades())
 
 
-def monitor_positions(risk: RiskEngine) -> None:
-    open_trades = get_open_trades()
+def monitor_positions(risk: RiskEngine, user_id: str | None = None) -> None:
+    open_trades = get_open_trades(user_id=user_id)
     if not open_trades:
         return
     for trade in open_trades:
@@ -204,49 +137,120 @@ def pick_best_signal(signals: list[dict]) -> dict | None:
     return signals[0]
 
 
-def trading_loop() -> None:
-    logger.info("Trading thread started")
-    if not init_mt5():
-        logger.error("MT5 init failed — trading thread exiting")
-        _bot_state["running"] = False
+def _run_user_cycle(user: dict) -> None:
+    user_id = user["user_id"]
+    login = user["login"]
+    password = user["password"]
+    server = user["server"]
+
+    if not connect_user_account(login, password, server):
+        logger.warning("Failed to connect MT5 for user %s", user_id)
         return
 
-    risk = RiskEngine()
-    max_daily = _bot_state.get("max_daily_trades") or get_user_max_daily_trades()
-    risk.max_daily_trades = max_daily
-    _bot_state["risk"] = risk
+    risk = RiskEngine(user_id=user_id)
+    risk.max_daily_trades = get_user_max_daily_trades(user_id=user_id)
+
+    monitor_positions(risk, user_id=user_id)
+
+    account_info = mt5.account_info()
+    account_balance = getattr(account_info, "balance", 10000.0) if account_info else 10000.0
+
+    risk_percent = None
+    trading_mode = "short"
+    auto_compound = False
+    try:
+        from brain.db.supabase import _get_conn
+        conn = _get_conn(SUPABASE_DB_URI)
+        with conn, conn.cursor() as cur:
+            cur.execute("SELECT risk_percent, trading_mode, auto_compounding FROM profiles WHERE id = %s", (user_id,))
+            row = cur.fetchone()
+            if row:
+                risk_percent = float(row[0]) if row[0] is not None else None
+                trading_mode = row[1] or "short"
+                auto_compound = bool(row[2]) if row[2] is not None else False
+        conn.close()
+    except Exception:
+        pass
+
+    signals = []
+    for pair in SUPPORTED_PAIRS:
+        if _stop_event.is_set():
+            break
+        try:
+            data = fetch_multi_tf(pair)
+            if not data:
+                continue
+            df = data.get("15m")
+            if df is None or len(df) < 20:
+                continue
+            signal = pipeline_run(pair, CANDLE_TF, df, risk=risk, risk_percent=risk_percent, data=data)
+            if signal is None:
+                continue
+            decision = risk.allow_trade(pair, current_atr=risk.baseline_atr.get(pair, 0), account_balance=account_balance)
+            if not decision.allowed:
+                logger.info("Risk gate blocked %s %s for user %s: %s", signal["direction"], pair, user_id, decision.reason)
+                continue
+            signal["_pair"] = pair
+            signals.append(signal)
+        except Exception as exc:
+            logger.error("Pipeline error for %s user %s: %s", pair, user_id, exc, exc_info=True)
+            continue
+
+    if trading_mode == "long":
+        max_concurrent = 3
+        open_positions = mt5.positions_get()
+        open_count = sum(1 for p in open_positions if p.symbol in SUPPORTED_PAIRS) if open_positions else 0
+        signals = signals[:max_concurrent - open_count]
+        signals.sort(key=lambda s: s.get("confidence", 0), reverse=True)
+    else:
+        if mt5.positions_get():
+            return
+        best = pick_best_signal(signals)
+        signals = [best] if best else []
+
+    if not signals:
+        return
+
+    for signal in signals:
+        if _stop_event.is_set():
+            break
+        pair = signal["_pair"]
+        sl_pips = signal["sl_pips"]
+        lots = risk.calculate_lot(pair, account_balance, sl_pips, risk_percent, auto_compound=auto_compound)
+        logger.info("Executing user=%s: %s %s | conf=%d | lots=%.2f", user_id, signal["direction"], pair, signal["confidence"], lots)
+
+        try:
+            result = place_order(
+                pair=pair,
+                direction=signal["direction"],
+                lots=lots,
+                entry_price=signal["entry_price"],
+                sl_price=signal["stop_loss"],
+                tp_price=signal["take_profit"],
+                confidence=signal["confidence"],
+                sectors=signal["sectors"],
+                supabase_uri=SUPABASE_DB_URI,
+                user_id=user_id,
+            )
+            if result:
+                logger.info("Trade executed user=%s | ticket=%s | %s %s | conf=%d%% | lots=%.2f",
+                            user_id, result["ticket"], signal["direction"], pair, signal["confidence"], lots)
+            else:
+                logger.warning("Order placement returned None for %s user %s", pair, user_id)
+        except Exception as exc:
+            logger.error("Execution error for %s user %s: %s", pair, user_id, exc, exc_info=True)
+
+        if trading_mode == "short":
+            break
+
+
+def trading_loop() -> None:
+    logger.info("Multi-user trading thread started")
     _bot_state["running"] = True
     _bot_state["start_time"] = datetime.now(timezone.utc).isoformat()
-
-    last_monitor_ts = 0.0
-    reconnect_attempts = 0
-    MAX_RECONNECT = 10
-
-    logger.info("Trading loop active | pairs=%s | tf=%s", SUPPORTED_PAIRS, CANDLE_TF)
+    logger.info("Trading loop active | pairs=%s | tf=%s | mode=multi-user", SUPPORTED_PAIRS, CANDLE_TF)
 
     while not _stop_event.is_set():
-        cycle_start = time.monotonic()
-
-        if not is_connected():
-            reconnect_attempts += 1
-            logger.warning("MT5 disconnected — reconnect %d/%d", reconnect_attempts, MAX_RECONNECT)
-            if reconnect_attempts >= MAX_RECONNECT:
-                logger.error("Max reconnects reached — shutting down")
-                _bot_state["running"] = False
-                break
-            time.sleep(5)
-            init_mt5()
-            continue
-        reconnect_attempts = 0
-
-        now_ts = time.monotonic()
-        if now_ts - last_monitor_ts >= MONITOR_INTERVAL_SECS:
-            try:
-                monitor_positions(risk)
-            except Exception as exc:
-                logger.warning("Position monitor error: %s", exc)
-            last_monitor_ts = now_ts
-
         if not _bot_state.get("running"):
             _stop_event.wait(timeout=1)
             continue
@@ -259,93 +263,23 @@ def trading_loop() -> None:
             _stop_event.wait(timeout=60)
             continue
 
-        trading_mode = _bot_state.get("trading_mode", "short")
-        if trading_mode == "short":
-            if has_open_position():
-                elapsed = time.monotonic() - cycle_start
-                sleep_for = max(0.0, SCAN_INTERVAL_SECS - elapsed)
-                _stop_event.wait(timeout=sleep_for)
-                continue
-
-        risk_percent = _bot_state.get("risk_percent")
-        account_info = mt5.account_info()
-        account_balance = getattr(account_info, "balance", 10000.0) if account_info else 10000.0
-
-        signals = []
-        for pair in SUPPORTED_PAIRS:
-            if _stop_event.is_set():
-                break
-            try:
-                data = fetch_multi_tf(pair)
-                if not data:
-                    continue
-                df = data.get("15m")
-                if df is None or len(df) < 20:
-                    continue
-                signal = pipeline_run(pair, CANDLE_TF, df, risk=risk, risk_percent=risk_percent, data=data)
-                if signal is None:
-                    continue
-                decision = risk.allow_trade(pair, current_atr=risk.baseline_atr.get(pair, 0), account_balance=account_balance)
-                if not decision.allowed:
-                    logger.info("Risk gate blocked %s %s: %s", signal["direction"], pair, decision.reason)
-                    continue
-                signal["_pair"] = pair
-                signals.append(signal)
-            except Exception as exc:
-                logger.error("Pipeline error for %s: %s", pair, exc, exc_info=True)
-                continue
-
-        if trading_mode == "long":
-            open_count = count_open_positions()
-            max_concurrent = _bot_state.get("max_concurrent", 3)
-            signals = signals[:max_concurrent - open_count]
-            signals.sort(key=lambda s: s.get("confidence", 0), reverse=True)
-        else:
-            best = pick_best_signal(signals)
-            signals = [best] if best else []
-
-        if not signals:
-            elapsed = time.monotonic() - cycle_start
-            sleep_for = max(0.0, SCAN_INTERVAL_SECS - elapsed)
-            _stop_event.wait(timeout=sleep_for)
+        users = get_all_mt5_credentials(SUPABASE_DB_URI)
+        if not users:
+            logger.debug("No MT5 credentials found — waiting for users to register")
+            _stop_event.wait(timeout=30)
             continue
 
-        for signal in signals:
-            if _stop_event.is_set():
+        for user in users:
+            if _stop_event.is_set() or not _bot_state.get("running"):
                 break
-            pair = signal["_pair"]
-            sl_pips = signal["sl_pips"]
-            auto_compound = _bot_state.get("auto_compounding", False) and trading_mode == "long"
-            lots = risk.calculate_lot(pair, account_balance, sl_pips, risk_percent, auto_compound=auto_compound)
-            logger.info("Executing: %s %s | conf=%d | lots=%.2f", signal["direction"], pair, signal["confidence"], lots)
-
             try:
-                result = place_order(
-                    pair=pair,
-                    direction=signal["direction"],
-                    lots=lots,
-                    entry_price=signal["entry_price"],
-                    sl_price=signal["stop_loss"],
-                    tp_price=signal["take_profit"],
-                    confidence=signal["confidence"],
-                    sectors=signal["sectors"],
-                    supabase_uri=SUPABASE_DB_URI,
-                    user_id=_bot_state.get("active_user_id"),
-                )
-                if result:
-                    logger.info("Trade executed | ticket=%s | %s %s | conf=%d%% | lots=%.2f",
-                                result["ticket"], signal["direction"], pair, signal["confidence"], lots)
-                else:
-                    logger.warning("Order placement returned None for %s", pair)
+                _run_user_cycle(user)
             except Exception as exc:
-                logger.error("Execution error for %s: %s", pair, exc, exc_info=True)
+                logger.error("User cycle error for %s: %s", user.get("user_id"), exc, exc_info=True)
+            finally:
+                mt5.shutdown()
 
-            if trading_mode == "short":
-                break
-
-        elapsed = time.monotonic() - cycle_start
-        sleep_for = max(0.0, SCAN_INTERVAL_SECS - elapsed)
-        _stop_event.wait(timeout=sleep_for)
+        _stop_event.wait(timeout=SCAN_INTERVAL_SECS)
 
     logger.info("Trading loop stopped cleanly")
     _bot_state["running"] = False
@@ -368,7 +302,6 @@ def _start_trading_thread() -> None:
     _bot_state["trading_thread"] = thread
 
 
-_bot_state["_init_mt5"] = init_mt5
 _bot_state["_start_trading"] = _start_trading_thread
 
 
@@ -403,12 +336,8 @@ def create_app() -> FastAPI:
         if missing:
             logger.warning("Missing required env vars: %s — API running without trading loop", missing)
 
-        login, password, server = get_mt5_creds()
-        if login and server:
-            _start_trading_thread()
-            logger.info("FuturesBrain v2.0 started with Supabase credentials")
-        else:
-            logger.info("FuturesBrain v2.0 API started — waiting for MT5 credentials from Supabase")
+        _start_trading_thread()
+        logger.info("FuturesBrain v2.0 multi-user API started")
 
     @app.on_event("shutdown")
     async def shutdown_event() -> None:

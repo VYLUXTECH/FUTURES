@@ -254,13 +254,6 @@ async def start_bot(req: StartBotRequest | None = None, request: Request = None,
         _bot_state["running"] = True
         return {"status": "already_running"}
 
-    init_mt5_fn = _bot_state.get("_init_mt5")
-    if init_mt5_fn:
-        loop = asyncio.get_event_loop()
-        ok = await loop.run_in_executor(None, init_mt5_fn)
-        if not ok:
-            raise HTTPException(status_code=502, detail="MT5 connection failed — check credentials in /mt5")
-
     start_fn = _bot_state.get("_start_trading")
     if start_fn and _bot_state.get("trading_thread") is None:
         start_fn()

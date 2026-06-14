@@ -30,13 +30,10 @@ from brain.db.postgres import init_db
 from brain.api.routes import router as fb_router, set_bot_state_ref
 import brain.main as brain_main
 from brain.main import (
-    get_mt5_creds,
     trading_loop,
-    init_mt5,
+    connect_user_account,
     monitor_positions,
     fetch_multi_tf,
-    has_open_position,
-    count_open_positions,
     pick_best_signal,
 )
 

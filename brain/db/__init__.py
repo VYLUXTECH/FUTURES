@@ -5,6 +5,7 @@ from .supabase import (
     count_trades_today, count_losses_last_24h, get_todays_pnl,
     get_state, set_state, log_signal,
     get_user_max_daily_trades, upsert_user_setting,
+    get_all_mt5_credentials,
 )
 
 __all__ = [
@@ -13,4 +14,5 @@ __all__ = [
     "count_trades_today", "count_losses_last_24h", "get_todays_pnl",
     "get_state", "set_state", "log_signal",
     "get_user_max_daily_trades", "upsert_user_setting",
+    "get_all_mt5_credentials",
 ]

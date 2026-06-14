@@ -312,6 +312,26 @@ def upsert_user_setting(
     threading.Thread(target=_task, daemon=True, name="supabase_user_settings").start()
 
 
+# ── Multi-User: Fetch all MT5 credentials ───────────────────
+
+def get_all_mt5_credentials(uri: str | None = None) -> list[dict]:
+    """Fetch every user's MT5 credentials with decrypted passwords."""
+    from brain.utils.crypto import decrypt_password
+    rows = _exec_query(
+        "SELECT user_id, login, password, server FROM mt5_credentials ORDER BY updated_at DESC",
+        uri=uri, fetch=True,
+    )
+    if not rows:
+        return []
+    for row in rows:
+        try:
+            row["password"] = decrypt_password(row["password"])
+        except Exception:
+            pass
+        row["login"] = int(row["login"])
+    return rows
+
+
 # ── Connection Test ─────────────────────────────────────────
 
 def test_connection(uri: str | None = None) -> tuple[bool, str]:
