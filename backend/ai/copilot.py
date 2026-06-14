@@ -234,15 +234,19 @@ RESPOND naturally and conversationally. Do NOT output JSON or code."""
 
     async def _tool_news_status(self, _args: dict) -> dict:
         try:
-            paused_pairs = []
-            for pair in SUPPORTED_PAIRS:
-                pass
+            from brain.core.news_volatility import MT5NewsFilter
+            filter = MT5NewsFilter()
+            filter.refresh(hours_ahead=4)
+            events = filter.get_upcoming_events(hours_ahead=4)
+            now_paused = any(filter.is_news_window(p) for p in SUPPORTED_PAIRS)
             return {
-                "news_paused": False,
-                "status": "No news impact",
+                "news_paused": now_paused,
+                "upcoming_events": events[:10],
+                "status": f"{len(events)} upcoming events in next 4h" if events else "No high-impact news expected",
             }
         except Exception as exc:
-            return {"news_paused": False, "status": f"News check unavailable: {exc}"}
+            logger.warning("News status error: %s", exc)
+            return {"news_paused": False, "upcoming_events": [], "status": f"News check unavailable"}
 
     async def _tool_bot_health(self, _args: dict) -> dict:
         if not MT5_AVAILABLE:
@@ -412,21 +416,27 @@ RESPOND naturally and conversationally. Do NOT output JSON or code."""
             elif role == "assistant":
                 query_parts.append(f"Assistant: {content}")
         query = "\n\n".join(query_parts) + "\n\nAssistant:"
-        params = urllib.parse.urlencode({"query": query, "model": AI_MODEL})
-        url = f"{AI_BASE_URL}/?{params}"
+        params = urllib.parse.urlencode({"text": query})
+        url = f"{AI_BASE_URL}?{params}"
 
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(
                     url,
                     timeout=aiohttp.ClientTimeout(total=60),
+                    headers={"Accept": "application/json"},
                 ) as resp:
                     if resp.status != 200:
-                        text = await resp.text()
-                        logger.error("LLM error %d: %s", resp.status, text[:300])
+                        body = await resp.text()
+                        logger.error("LLM error %d: %s", resp.status, body[:300])
                         return "I'm having trouble connecting right now."
                     data = await resp.json()
-                    return data.get("message", {}).get("content", "") or "Done."
+                    if isinstance(data, str):
+                        return data
+                    return (data.get("message", {}).get("content", "")
+                            or data.get("response", "")
+                            or data.get("text", "")
+                            or str(data)[:500] or "Done.")
         except asyncio.TimeoutError:
             return "I'm thinking too long. Try again."
         except aiohttp.ClientError as exc:

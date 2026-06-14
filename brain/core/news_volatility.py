@@ -153,6 +153,21 @@ class MT5NewsFilter:
 
         return False
 
+    def get_upcoming_events(self, hours_ahead: int = 4) -> list[dict]:
+        now = datetime.now(timezone.utc)
+        end = (now + timedelta(hours=hours_ahead)).isoformat()
+        with _news_conn() as conn:
+            rows = conn.execute(
+                """SELECT event_time, currency, description, importance
+                   FROM events WHERE event_time BETWEEN ? AND ?
+                   ORDER BY event_time ASC LIMIT 20""",
+                (now.isoformat(), end),
+            ).fetchall()
+        return [
+            {"time": r[0], "currency": r[1], "description": r[2], "importance": r[3]}
+            for r in rows
+        ]
+
     def record_event_passed(self) -> None:
         now = datetime.now(timezone.utc)
         self._post_news_until = now + timedelta(minutes=POST_NEWS_COOLDOWN_MINUTES)
