@@ -224,8 +224,11 @@ def _run_user_cycle(user: dict) -> None:
     if not signals:
         return
 
+    trade_count = _bot_state.get("trade_count", 1)
+    trades_placed = 0
+
     for signal in signals:
-        if _stop_event.is_set():
+        if _stop_event.is_set() or trades_placed >= trade_count:
             break
         pair = signal["_pair"]
         sl_pips = signal["sl_pips"]
@@ -248,6 +251,7 @@ def _run_user_cycle(user: dict) -> None:
             if result:
                 logger.info("Trade executed user=%s | ticket=%s | %s %s | conf=%d%% | lots=%.2f",
                             user_id, result["ticket"], signal["direction"], pair, signal["confidence"], lots)
+                trades_placed += 1
             else:
                 logger.warning("Order placement returned None for %s user %s", pair, user_id)
         except Exception as exc:
