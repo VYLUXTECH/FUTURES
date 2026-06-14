@@ -145,15 +145,20 @@ def _run_user_cycle(user: dict) -> None:
 
     if not connect_user_account(login, password, server):
         logger.warning("Failed to connect MT5 for user %s", user_id)
+        _bot_state[f"acct:{user_id}"] = {"balance": 0, "equity": 0}
         return
+
+    account_info = mt5.account_info()
+    balance = getattr(account_info, "balance", 0.0) if account_info else 0.0
+    equity = getattr(account_info, "equity", 0.0) if account_info else 0.0
+    _bot_state[f"acct:{user_id}"] = {"balance": balance, "equity": equity}
 
     risk = RiskEngine(user_id=user_id)
     risk.max_daily_trades = get_user_max_daily_trades(user_id=user_id)
 
     monitor_positions(risk, user_id=user_id)
 
-    account_info = mt5.account_info()
-    account_balance = getattr(account_info, "balance", 10000.0) if account_info else 10000.0
+    account_balance = balance
 
     risk_percent = None
     trading_mode = "short"

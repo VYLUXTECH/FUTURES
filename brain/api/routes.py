@@ -102,19 +102,15 @@ async def bot_status(user: dict = Depends(require_auth)) -> BotStatusResponse:
     from datetime import datetime, timezone
     from brain.config.constants import SESSION_START_UTC, SESSION_END_UTC
 
-    loop = asyncio.get_event_loop()
-    account = await loop.run_in_executor(None, mt5.account_info)
+    user_id = user.get("sub")
 
-    balance: float = getattr(account, "balance", 0.0) if account else 0.0
-    equity: float  = getattr(account, "equity",  0.0) if account else 0.0
-
-    terminal  = await loop.run_in_executor(None, mt5.terminal_info)
-    connected = terminal is not None and bool(terminal.connected)
+    acct = _bot_state.get(f"acct:{user_id}", {})
+    balance: float = acct.get("balance", 0.0)
+    equity: float  = acct.get("equity", 0.0)
 
     risk = _bot_state.get("risk")
     cooldown = bool(risk and risk.in_cooldown) if risk else False
 
-    user_id = user.get("sub")
     daily_trades = count_trades_today(user_id=user_id)
     daily_pnl    = get_todays_pnl(user_id=user_id)
 
@@ -144,8 +140,8 @@ async def bot_status(user: dict = Depends(require_auth)) -> BotStatusResponse:
 
     return BotStatusResponse(
         running=bool(_bot_state.get("running")),
-        connected=connected,
-        mt5_connected=connected,
+        connected=mt5_configured,
+        mt5_connected=mt5_configured,
         mt5_configured=mt5_configured,
         account_balance=balance,
         equity=equity,
@@ -168,17 +164,13 @@ async def dashboard(user: dict = Depends(require_auth)) -> dict:
     recent_trades = get_recent_trades(limit=10, user_id=user_id)
     daily_pnl = get_todays_pnl(user_id=user_id)
 
-    loop = asyncio.get_event_loop()
-    account = await loop.run_in_executor(None, mt5.account_info)
-    balance = getattr(account, "balance", 0.0) if account else 0.0
-    equity  = getattr(account, "equity",  0.0) if account else 0.0
-    margin  = getattr(account, "margin",  0.0) if account else 0.0
+    acct = _bot_state.get(f"acct:{user_id}", {})
+    balance = acct.get("balance", 0.0)
+    equity  = acct.get("equity", 0.0)
 
     return {
         "balance":       balance,
         "equity":        equity,
-        "margin":        margin,
-        "daily_pnl":     daily_pnl,
         "open_trades":   open_trades,
         "recent_trades": recent_trades,
     }
@@ -446,6 +438,13 @@ async def mt5_connect(req: MT5ConnectRequest, user: dict = Depends(require_auth)
         result["status"] = "connected_no_ea"
     elif result["connected"] and result["automated_trading_enabled"]:
         result["status"] = "connected_ea_ready"
+
+    user_id = user.get("sub")
+    if result.get("connected") and result.get("account"):
+        _bot_state[f"acct:{user_id}"] = {
+            "balance": result["account"]["balance"],
+            "equity":  result["account"]["equity"],
+        }
 
     logger.info(
         "MT5 connect test | status=%s | login=%s | ea=%s",
