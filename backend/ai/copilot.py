@@ -114,6 +114,8 @@ AVAILABLE TOOLS (use via TOOL_CALL format when user asks for data or wants to ch
 When the user asks for data or wants to change settings, respond with a tool call in this exact format:
 TOOL_CALL: tool_name | arg1=val1 | arg2=val2
 
+CRITICAL INSTRUCTION: When the user says something like "trade X times" or "start trading for X trades" or "trade X times with Y% risk", call the start_trading tool with trade_count=X and/or risk_percent=Y. Ignore casual filler words like "trmx", "pls", "now", "please" — they are not trading pairs. The only supported pairs are: GBPUSD, GBPJPY, USDJPY, EURUSD, AUDUSD, USDCAD.
+
 RESPOND naturally and conversationally. Do NOT output JSON or code unless calling a tool."""
 
     def _get_user_info(self, user_id: str) -> dict | None:
