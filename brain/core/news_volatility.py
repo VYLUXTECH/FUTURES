@@ -169,7 +169,7 @@ class MT5NewsFilter:
         end = (now + timedelta(hours=hours_ahead)).isoformat()
         with _news_conn() as conn:
             rows = conn.execute(
-                """SELECT event_time, currency, description, importance
+                """SELECT event_time, currency, event_name, importance
                    FROM events WHERE event_time BETWEEN ? AND ?
                    ORDER BY event_time ASC LIMIT 20""",
                 (now.isoformat(), end),

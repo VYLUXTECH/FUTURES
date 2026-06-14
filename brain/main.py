@@ -153,6 +153,12 @@ def _run_user_cycle(user: dict) -> None:
     equity = getattr(account_info, "equity", 0.0) if account_info else 0.0
     _bot_state[f"acct:{user_id}"] = {"balance": balance, "equity": equity}
 
+    try:
+        from brain.core.news_volatility import MT5NewsFilter
+        MT5NewsFilter().refresh(hours_ahead=8, force=False)
+    except Exception:
+        pass
+
     risk = RiskEngine(user_id=user_id)
     risk.max_daily_trades = get_user_max_daily_trades(user_id=user_id)
 
@@ -250,7 +256,7 @@ def _run_user_cycle(user: dict) -> None:
 
 
 def _refresh_account_info(user: dict) -> None:
-    """Quick connect, read balance/equity, disconnect. Does NOT trade."""
+    """Quick connect, read balance/equity, cache news. Does NOT trade."""
     user_id = user["user_id"]
     login = user["login"]
     password = user["password"]
@@ -260,6 +266,11 @@ def _refresh_account_info(user: dict) -> None:
         balance = getattr(info, "balance", 0.0) if info else 0.0
         equity = getattr(info, "equity", 0.0) if info else 0.0
         _bot_state[f"acct:{user_id}"] = {"balance": balance, "equity": equity}
+        try:
+            from brain.core.news_volatility import MT5NewsFilter
+            MT5NewsFilter().refresh(hours_ahead=8, force=False)
+        except Exception:
+            pass
     else:
         _bot_state[f"acct:{user_id}"] = {"balance": 0, "equity": 0}
     mt5.shutdown()
