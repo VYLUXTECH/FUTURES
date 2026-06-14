@@ -352,11 +352,6 @@ async def mt5_connect(req: MT5ConnectRequest, user: dict = Depends(require_auth)
         logger.info("No server configured yet — skipping connection test")
         return result
 
-    # ── Test MT5 Connection (only if trading loop is NOT running) ──
-    if _bot_state.get("running"):
-        result["warning"] = "Trading loop is active — restart to apply new credentials"
-        return result
-
     loop = asyncio.get_event_loop()
 
     def _test_connection() -> dict:
