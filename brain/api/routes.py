@@ -355,13 +355,10 @@ async def mt5_connect(req: MT5ConnectRequest, user: dict = Depends(require_auth)
     loop = asyncio.get_event_loop()
 
     def _test_connection() -> dict:
+        from brain.utils.mt5_helper import reconnect_mt5
         mt5.shutdown()
         try:
-            ok = mt5.initialize(
-                login=int(login_to_use),
-                password=password_to_use,
-                server=server_to_use,
-            )
+            ok = reconnect_mt5(int(login_to_use), password_to_use, server_to_use, max_retries=2)
             if not ok:
                 err = mt5.last_error()
                 mt5.shutdown()
