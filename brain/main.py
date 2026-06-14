@@ -145,7 +145,7 @@ def _run_user_cycle(user: dict) -> None:
 
     if not connect_user_account(login, password, server):
         logger.warning("Failed to connect MT5 for user %s", user_id)
-        _bot_state[f"acct:{user_id}"] = {"balance": 0, "equity": 0}
+        _bot_state.setdefault(f"acct:{user_id}", {"balance": 0, "equity": 0})
         return
 
     account_info = mt5.account_info()
@@ -271,7 +271,7 @@ def _refresh_account_info(user: dict) -> None:
             MT5NewsFilter().refresh(hours_ahead=8, force=False)
         except Exception:
             pass
-    else:
+    elif f"acct:{user_id}" not in _bot_state:
         _bot_state[f"acct:{user_id}"] = {"balance": 0, "equity": 0}
     mt5.shutdown()
 

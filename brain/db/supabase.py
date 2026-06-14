@@ -318,7 +318,8 @@ def get_all_mt5_credentials(uri: str | None = None) -> list[dict]:
     """Fetch every user's MT5 credentials with decrypted passwords."""
     from brain.utils.crypto import decrypt_password
     rows = _exec_query(
-        "SELECT user_id, login, password, server FROM mt5_credentials ORDER BY updated_at DESC",
+        "SELECT DISTINCT ON (user_id) user_id, login, password, server "
+        "FROM mt5_credentials ORDER BY user_id, updated_at DESC",
         uri=uri, fetch=True,
     )
     if not rows:
