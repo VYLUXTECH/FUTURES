@@ -49,12 +49,17 @@ class MT5NewsFilter:
                        id         TEXT PRIMARY KEY,
                        event_time TEXT NOT NULL,
                        currency   TEXT NOT NULL,
-                       event_name TEXT
+                       event_name TEXT,
+                       importance INTEGER DEFAULT 3
                    )"""
             )
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_time ON events (event_time)"
             )
+            try:
+                conn.execute("ALTER TABLE events ADD COLUMN importance INTEGER DEFAULT 3")
+            except Exception:
+                pass
             conn.commit()
 
     def refresh(self, hours_ahead: int = 4, force: bool = False) -> int:
@@ -68,11 +73,16 @@ class MT5NewsFilter:
             events = mt5.calendar_history_get(now, end)
         except Exception as exc:
             logger.warning("MT5 calendar unavailable: %s", exc)
+            cached = self._count_cached(now)
+            if cached > 0:
+                self._last_refresh = now
+                return cached
             return 0
 
         if not events:
             self._last_refresh = now
-            return 0
+            cached = self._count_cached(now)
+            return cached if cached > 0 else 0
 
         count = 0
         with _NEWS_LOCK, _news_conn() as conn:
@@ -100,10 +110,11 @@ class MT5NewsFilter:
                     or f"{country}_{int(evt_time.timestamp())}"
                 )
                 evt_name = str(getattr(e, "name", getattr(e, "event_name", "")))
+                importance_val = int(importance)
 
                 conn.execute(
-                    "INSERT OR REPLACE INTO events VALUES (?,?,?,?)",
-                    (evt_id, evt_time.isoformat(), currency, evt_name),
+                    "INSERT OR REPLACE INTO events (id, event_time, currency, event_name, importance) VALUES (?,?,?,?,?)",
+                    (evt_id, evt_time.isoformat(), currency, evt_name, importance_val),
                 )
                 count += 1
 
