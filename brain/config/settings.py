@@ -19,11 +19,11 @@ BASE_DIR: Path = Path(__file__).resolve().parent.parent
 for _dir in ["db", "logs", "charts"]:
     (BASE_DIR / _dir).mkdir(parents=True, exist_ok=True)
 
-# ── AI (Custom endpoint via all-in-1-ais) ─────────────────
+# ── AI (Gemini via nexray) ────────────────────────────────
 AI_BASE_URL: str = os.getenv(
-    "AI_BASE_URL", "https://all-in-1-ais.officialhectormanuel.workers.dev"
+    "AI_BASE_URL", "https://api.nexray.eu.cc/ai/gemini"
 )
-AI_MODEL: str = os.getenv("AI_MODEL", "deepseek")
+AI_MODEL: str = os.getenv("AI_MODEL", "gemini")
 
 # ── Hugging Face (vision / chart analysis) ────────────────
 HF_TOKEN: str | None = os.getenv("HF_TOKEN")

@@ -1,6 +1,6 @@
 # ============================================================
-# FuturesBrain v1.0 – AI Copilot Endpoint (Custom AI + HF Vision)
-# Uses DeepSeek via all-in-1-ais for text analysis and
+# FuturesBrain v1.0 – AI Copilot Endpoint (Gemini + HF Vision)
+# Uses Gemini via nexray for text analysis and
 # Qwen-VL via HuggingFace Inference API for chart vision.
 # ============================================================
 from __future__ import annotations
