@@ -81,14 +81,19 @@ class CopilotEngine:
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
         summaries = self.market_summary.get_all_summaries()
+        from brain.config.constants import SUPPORTED_PAIRS
         market_text = ""
-        for pair, s in summaries.items():
-            rejection = f", rejection: {s['rejection']}" if s.get("rejection") else ""
-            market_text += (
-                f"- {pair}: ${s['price']}, bias {s['bias']}, "
-                f"support ${s['support']}, resistance ${s['resistance']}"
-                f"{rejection}\n"
-            )
+        for pair in SUPPORTED_PAIRS:
+            s = summaries.get(pair)
+            if s:
+                rejection = f", rejection: {s['rejection']}" if s.get("rejection") else ""
+                market_text += (
+                    f"- {pair}: ${s['price']}, bias {s['bias']}, "
+                    f"support ${s['support']}, resistance ${s['resistance']}"
+                    f"{rejection}\n"
+                )
+            else:
+                market_text += f"- {pair}: data pending (waiting for MT5 sync)\n"
 
         memories = self._load_memories(user_id)
         memory_text = ""
