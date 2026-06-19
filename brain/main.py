@@ -15,7 +15,7 @@ from brain.core.pipeline import run as pipeline_run
 from brain.core.executor import place_order, modify_sl_to_break_even
 from brain.core.risk import RiskEngine
 from brain.data.feed import get_candles
-from brain.db import get_open_trades, get_user_max_daily_trades
+from brain.db import get_all_mt5_credentials, get_open_trades, get_user_max_daily_trades
 from brain.api.routes import set_bot_state_ref
 from brain.db.supabase import set_state
 from brain.utils.mt5_helper import reconnect_mt5, is_connected
