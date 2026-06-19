@@ -286,7 +286,6 @@ def _refresh_account_info(user: dict) -> None:
 
 def trading_loop() -> None:
     logger.info("Multi-user trading thread started")
-    _bot_state["running"] = True
     _bot_state["start_time"] = datetime.now(timezone.utc).isoformat()
     logger.info("Trading loop active | pairs=%s | tf=%s | mode=multi-user", SUPPORTED_PAIRS, CANDLE_TF)
 
