@@ -173,12 +173,13 @@ async def save_mt5_credentials(req: MT5CredentialsUpdate, user: dict = Depends(r
         is_demo = "demo" in req.server.lower()
         account_type = "demo" if is_demo else "real"
 
-        existing = client.table("mt5_credentials").select("server").eq("user_id", user_id).execute()
+        existing = client.table("mt5_credentials").select("login,server").eq("user_id", user_id).execute()
         if existing.data:
             same_type = [
                 e for e in existing.data
                 if ("demo" in (e.get("server") or "").lower()) == is_demo
-                and (e.get("server") or "") != req.server
+                and (e.get("server") or "").lower() != req.server.lower()
+                and str(e.get("login", "")) != str(req.login)
             ]
             if same_type:
                 return {"error": f"You can only connect one {account_type} account. Disconnect the existing one first."}
@@ -214,6 +215,23 @@ async def update_mt5_credentials(req: MT5CredentialsUpdate, user: dict = Depends
         return {"status": "updated"}
     except Exception as e:
         logger.warning("Failed to update MT5 credentials: %s", e)
+        return {"error": str(e)}
+
+
+@router.delete("/mt5/credentials/{login}/{server}")
+async def delete_mt5_credentials(login: str, server: str, user: dict = Depends(require_auth)) -> dict:
+    """Delete a saved MT5 credential by login and server."""
+    client = get_client()
+    if not client:
+        return {"error": "Supabase not configured"}
+    user_id = user.get("sub")
+    if not user_id:
+        return {"error": "not authenticated"}
+    try:
+        client.table("mt5_credentials").delete().eq("user_id", user_id).eq("login", login).eq("server", server).execute()
+        return {"status": "deleted"}
+    except Exception as e:
+        logger.warning("Failed to delete MT5 credentials: %s", e)
         return {"error": str(e)}
 
 
