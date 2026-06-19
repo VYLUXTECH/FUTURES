@@ -234,9 +234,34 @@ RESPOND naturally and conversationally. Do NOT output JSON or code unless callin
     async def _tool_market_summary(self, args: dict, _user_id: str) -> dict:
         symbol = args.get("symbol", "").upper()
         summary = self.market_summary.get_summary(symbol)
-        if not summary:
-            return {"error": f"No market data for {symbol}"}
-        return summary
+        if summary:
+            return summary
+        from brain.core.news_volatility import calculate_atr
+        from brain.config.constants import PIP_SIZES
+        from brain.data.feed import get_candles
+        try:
+            df = get_candles(symbol, "1m", 100)
+            if df is None or df.empty or len(df) < 20:
+                return {"error": f"Insufficient data for {symbol}"}
+            last = df.iloc[-1]
+            pip_size = PIP_SIZES.get(symbol, 0.0001)
+            current_price = float(last["close"])
+            high_20 = float(df["high"].tail(20).max())
+            low_20 = float(df["low"].tail(20).min())
+            support = low_20
+            resistance = high_20
+            sma5 = float(df["close"].tail(5).mean())
+            sma20 = float(df["close"].tail(20).mean())
+            bias = "bullish" if sma5 > sma20 else "bearish"
+            return {
+                "symbol": symbol,
+                "price": round(current_price, 5),
+                "support": round(support, 5),
+                "resistance": round(resistance, 5),
+                "bias": bias,
+            }
+        except Exception as exc:
+            return {"error": f"No market data for {symbol}: {exc}"}
 
     async def _tool_explain_last_trade(self, _args: dict, user_id: str) -> dict:
         trades = get_recent_trades(limit=1, user_id=user_id)
