@@ -3,6 +3,9 @@ cd C:\futures
 git remote set-url origin https://github.com/VYLUXTECH/FUTURES.git 2>$null
 git pull
 
+Write-Host "`n=== Installing Python deps ===" -ForegroundColor Yellow
+pip install -r requirements.txt
+
 Write-Host "`n=== Building frontend ===" -ForegroundColor Yellow
 cd C:\futures\web-app
 npm install
