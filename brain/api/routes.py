@@ -219,37 +219,9 @@ async def start_bot(req: StartBotRequest | None = None, request: Request = None,
     """Signal the trading loop to (re)start. Accepts risk config.
     Modes: 'short' (single trade, default), 'long' (continuous trading with auto-compounding).
     If the trading thread isn't running yet, starts it with
-    MT5 credentials from Supabase mt5_credentials table.
-    Requires broker_verified profile to trade."""
-    # ── Check broker verification ────────────────────────────
+    MT5 credentials from Supabase mt5_credentials table."""
     jwt_payload = _decode_jwt(request)
     user_id = jwt_payload.get("sub")
-    if user_id:
-        import os
-        from brain.config.settings import SUPABASE_DB_URI
-        uri = SUPABASE_DB_URI or os.getenv("SUPABASE_DB_URI")
-        if uri:
-            try:
-                from brain.db.supabase import _get_conn
-                conn = _get_conn(uri)
-                with conn, conn.cursor() as cur:
-                    cur.execute(
-                        "SELECT broker_verified, broker_name FROM profiles WHERE id = %s",
-                        (user_id,),
-                    )
-                    row = cur.fetchone()
-                conn.close()
-                if row and not row[0]:
-                    raise HTTPException(
-                        status_code=403,
-                        detail="Account not verified. Please sign up through our partner broker to use the trading bot."
-                    )
-                if row:
-                    logger.info("Bot start | user=%s | broker_verified=%s | broker=%s", user_id, row[0], row[1])
-            except HTTPException:
-                raise
-            except Exception as exc:
-                logger.warning("Broker verification check failed: %s", exc)
 
     if req:
         risk_pct = req.risk_percent
