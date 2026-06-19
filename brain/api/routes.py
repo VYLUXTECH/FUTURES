@@ -239,8 +239,10 @@ async def start_bot(req: StartBotRequest | None = None, request: Request = None,
         return {"status": "already_running"}
 
     start_fn = _bot_state.get("_start_trading")
-    if start_fn and _bot_state.get("trading_thread") is None:
-        start_fn()
+    if start_fn:
+        if trading_thread is None or not trading_thread.is_alive():
+            _bot_state["trading_thread"] = None
+            start_fn()
 
     _bot_state["active_user_id"] = user.get("sub")
     _bot_state["running"] = True
