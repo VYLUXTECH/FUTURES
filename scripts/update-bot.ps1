@@ -5,6 +5,7 @@ git pull
 
 Write-Host "`n=== Installing Python deps ===" -ForegroundColor Yellow
 pip install -r requirements.txt
+pip install mplfinance
 
 Write-Host "`n=== Building frontend ===" -ForegroundColor Yellow
 cd C:\futures\web-app
