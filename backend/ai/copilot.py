@@ -104,7 +104,18 @@ class CopilotEngine:
         user_info = self._get_user_info(user_id)
         user_text = ""
         if user_info:
-            user_text = f"YOUR SETTINGS:\n- risk: {user_info.get('risk_percent', 5)}%\n- mode: {user_info.get('trading_mode', 'short')}\n- daily limit: {user_info.get('max_daily_trades', 5)}\n- compounding: {'on' if user_info.get('auto_compounding') else 'off'}\n- broker connected: {'yes' if user_info.get('broker_verified') else 'no'}\n\n"
+            balance = user_info.get("balance", 0)
+            equity = user_info.get("equity", 0)
+            user_text = (
+                f"YOUR ACCOUNT:\n- balance: ${balance}\n- equity: ${equity}\n\n"
+                f"YOUR SETTINGS:\n- risk: {user_info.get('risk_percent', 5)}%\n"
+                f"- mode: {user_info.get('trading_mode', 'short')}\n"
+                f"- daily limit: {user_info.get('max_daily_trades', 5)}\n"
+                f"- compounding: {'on' if user_info.get('auto_compounding') else 'off'}\n"
+                f"- broker connected: {'yes' if user_info.get('broker_verified') else 'no'}\n\n"
+            )
+
+        news_text = self._get_news_summary()
 
         return f"""You are FUTURES — a trading bot that uses a proprietary strategy created by Richie Rich. You are calm, risk-aware, and brief (1-2 sentences). You NEVER promise returns or encourage excessive risk. You NEVER give financial advice — only analysis. If asked non-trading questions, politely refuse. Use the user's name if known.
 
@@ -113,6 +124,7 @@ DATE: {now} UTC
 {memory_text}{user_text}CURRENT MARKET CONDITIONS:
 {market_text or "Market data not yet available."}
 
+{news_text}
 AVAILABLE TOOLS (use via TOOL_CALL format when user asks for data or wants to change settings):
 """ + "\n".join(f"- {t['name']}: {t['description']}" for t in TOOL_DEFINITIONS) + """
 
@@ -141,10 +153,38 @@ RESPOND naturally and conversationally. Do NOT output JSON or code unless callin
                 info["max_daily_trades"] = settings.data.get("max_daily_trades", 5)
                 info["trade_count"] = settings.data.get("trade_count", 1)
             info["mt5_connected"] = bool(creds.data.get("connected")) if creds.data else False
+            acct = self._bot_state.get(f"acct:{user_id}", {})
+            if acct:
+                info["balance"] = acct.get("balance", 0)
+                info["equity"] = acct.get("equity", 0)
+            else:
+                saved = get_state(f"balance:{user_id}")
+                if saved:
+                    info["balance"] = saved.get("balance", 0)
+                    info["equity"] = saved.get("equity", 0)
             return info
         except Exception as exc:
             logger.debug("Failed to fetch user info for %s: %s", user_id, exc)
             return None
+
+    def _get_news_summary(self) -> str:
+        try:
+            from brain.core.news_volatility import MT5NewsFilter
+            nf = MT5NewsFilter()
+            nf.refresh(hours_ahead=24, force=False)
+            events = nf.get_upcoming_events(hours_ahead=24)
+            if not events:
+                return "No high-impact news events expected in the next 24h.\n\n"
+            high_impact = []
+            for e in events:
+                name = e.get("description", "")
+                if any(kw in name.lower() for kw in ("nfp", "nonfarm", "cpi", "pce", "gdp", "fed", "interest", "payroll", "unemployment")):
+                    high_impact.append(f"  - {e.get('time', '?')[:16]} | {e.get('currency', '?')} | {name}")
+            if not high_impact:
+                return "No high-impact news (NFP/CPI/PCE/GDP) expected in the next 24h.\n\n"
+            return "UPCOMING KEY EVENTS:\n" + "\n".join(high_impact[:5]) + "\n\n"
+        except Exception:
+            return ""
 
     # ── Rate Limiting ──────────────────────────────────────
 
@@ -171,6 +211,7 @@ RESPOND naturally and conversationally. Do NOT output JSON or code unless callin
             "get_news_status": self._tool_news_status,
             "get_bot_health": self._tool_bot_health,
             "get_daily_pnl": self._tool_daily_pnl,
+            "get_balance": self._tool_balance,
             "get_trading_strategy": self._tool_trading_strategy,
         }
         handler = handlers.get(tool_name)
@@ -189,6 +230,8 @@ RESPOND naturally and conversationally. Do NOT output JSON or code unless callin
         daily_limit = info.get("max_daily_trades", 5) if info else 5
         bot_running = self._bot_state.get("running", False)
         return {
+            "balance": info.get("balance", 0) if info else 0,
+            "equity": info.get("equity", 0) if info else 0,
             "trades_today": trades_today,
             "trades_remaining": max(0, daily_limit - trades_today),
             "daily_limit": daily_limit,
@@ -298,17 +341,20 @@ RESPOND naturally and conversationally. Do NOT output JSON or code unless callin
         try:
             from brain.core.news_volatility import MT5NewsFilter
             filter = MT5NewsFilter()
-            filter.refresh(hours_ahead=4)
-            events = filter.get_upcoming_events(hours_ahead=4)
+            filter.refresh(hours_ahead=24)
+            events = filter.get_upcoming_events(hours_ahead=24)
             now_paused = any(filter.is_news_window(p) for p in SUPPORTED_PAIRS)
+            nfp_cpi = [e for e in events if any(kw in e.get("description", "").lower() for kw in ("nfp", "nonfarm", "cpi", "pce", "gdp", "fed", "interest", "payroll", "unemployment"))]
             return {
                 "news_paused": now_paused,
-                "upcoming_events": events[:10],
-                "status": f"{len(events)} upcoming events in next 4h" if events else "No high-impact news expected",
+                "upcoming_events": events[:20],
+                "key_events": nfp_cpi[:5],
+                "total_upcoming": len(events),
+                "status": f"{len(events)} events upcoming" if events else "No high-impact news expected",
             }
         except Exception as exc:
             logger.warning("News status error: %s", exc)
-            return {"news_paused": False, "upcoming_events": [], "status": "News check unavailable"}
+            return {"news_paused": False, "upcoming_events": [], "key_events": [], "total_upcoming": 0, "status": "News check unavailable"}
 
     async def _tool_bot_health(self, _args: dict, user_id: str) -> dict:
         info = self._get_user_info(user_id)
@@ -320,6 +366,12 @@ RESPOND naturally and conversationally. Do NOT output JSON or code unless callin
             "broker_verified": info.get("broker_verified", False) if info else False,
             "healthy": mt5_ok and bot_running,
         }
+
+    async def _tool_balance(self, _args: dict, user_id: str) -> dict:
+        info = self._get_user_info(user_id)
+        bal = info.get("balance", 0) if info else 0
+        eq = info.get("equity", 0) if info else 0
+        return {"balance": bal, "equity": eq}
 
     async def _tool_daily_pnl(self, _args: dict, user_id: str) -> dict:
         pnl = get_todays_pnl(user_id=user_id)

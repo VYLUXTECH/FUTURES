@@ -110,6 +110,16 @@ TOOL_DEFINITIONS: list[dict] = [
         },
     },
     {
+        "name": "get_balance",
+        "description": "Get the user's current account balance, equity, and free margin.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+            "required": [],
+        },
+    },
+    {
         "name": "get_daily_pnl",
         "description": "Get today's profit and loss.",
         "parameters": {
@@ -233,6 +243,7 @@ INFO_TOOL_NAMES: frozenset[str] = frozenset({
     "get_account_summary", "get_open_positions", "get_recent_trades",
     "get_market_summary", "explain_last_trade", "generate_chart",
     "get_news_status", "get_bot_health", "get_daily_pnl", "get_trading_strategy",
+    "get_balance",
 })
 
 ACTION_TOOL_NAMES: frozenset[str] = frozenset({
