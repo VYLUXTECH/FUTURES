@@ -106,11 +106,14 @@ class CopilotEngine:
         if user_info:
             balance = user_info.get("balance", 0)
             equity = user_info.get("equity", 0)
+            daily_limit = user_info.get("max_daily_trades", 5)
+            trades_today = count_trades_today(user_id=user_id)
+            trades_left = max(0, daily_limit - trades_today)
             user_text = (
                 f"YOUR ACCOUNT:\n- balance: ${balance}\n- equity: ${equity}\n\n"
                 f"YOUR SETTINGS:\n- risk: {user_info.get('risk_percent', 5)}%\n"
                 f"- mode: {user_info.get('trading_mode', 'short')}\n"
-                f"- daily limit: {user_info.get('max_daily_trades', 5)}\n"
+                f"- daily limit: {daily_limit} ({trades_left} trades remaining today)\n"
                 f"- compounding: {'on' if user_info.get('auto_compounding') else 'off'}\n"
                 f"- broker connected: {'yes' if user_info.get('broker_verified') else 'no'}\n\n"
             )
