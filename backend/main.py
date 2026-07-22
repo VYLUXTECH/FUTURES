@@ -10,7 +10,6 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -43,7 +42,6 @@ from backend.api.settings import router as settings_router, set_bot_state_ref as
 from backend.api.public import router as public_router
 from backend.ai import CopilotEngine, MarketSummaryEngine, ChartGenerator
 from backend.db.supabase import get_client
-from backend.telegram_bot import TelegramAdminBot, create_admin_bot
 
 setup_logging()
 logger = logging.getLogger("futures.app")
@@ -55,7 +53,6 @@ _bot_state: dict = {
     "risk": None,
     "start_time": None,
 }
-_telegram_bot: TelegramAdminBot | None = None
 _trading_thread: threading.Thread | None = None
 
 
@@ -89,16 +86,6 @@ async def lifespan(app: FastAPI):
         _trading_thread.start()
         logger.info("FUTURES trading engine started")
 
-    # ── Start Telegram admin bot ─────────────────────
-    global _telegram_bot
-    try:
-        _telegram_bot = create_admin_bot(_bot_state)
-        await _telegram_bot.start()
-    except RuntimeError as exc:
-        logger.warning("Telegram admin bot not started: %s", exc)
-    except Exception as exc:
-        logger.error("Failed to start Telegram admin bot: %s", exc)
-
     yield
 
     _stop_event.set()
@@ -122,8 +109,6 @@ async def lifespan(app: FastAPI):
         logger.info("Trading engine restarted")
         return  # keep the bot running; lifespan continues until actual shutdown
 
-    if _telegram_bot:
-        await _telegram_bot.stop()
     logger.info("FUTURES shutting down...")
 
 
@@ -154,28 +139,6 @@ app.include_router(settings_router)
 
 set_bot_state_ref(_bot_state)
 set_settings_state_ref(_bot_state)
-
-# ── SPA static file handler (client-side routing fallback) ──
-class SPAStaticFiles(StaticFiles):
-    """Serves static files with SPA fallback — returns index.html for any
-    non-file path so that React Router handles client-side routing."""
-
-    async def get_response(self, path: str, scope):
-        try:
-            return await super().get_response(path, scope)
-        except Exception as e:
-            if getattr(e, "status_code", None) == 404:
-                return await super().get_response("index.html", scope)
-            raise
-
-# ── Serve web frontend ──────────────────────────────────
-_DIST = Path(__file__).resolve().parent.parent / "web-app" / "dist"
-
-if _DIST.exists():
-    app.mount("/", SPAStaticFiles(directory=str(_DIST), html=True), name="web")
-    logger.info("Serving SPA from %s", _DIST)
-else:
-    logger.warning("No frontend dist found at %s — run 'npm run build' in web-app/", _DIST)
 
 
 # ── Restart helper ────────────────────────────────────────

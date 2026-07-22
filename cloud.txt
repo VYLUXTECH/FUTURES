@@ -1,0 +1,40 @@
+Cloudflare Bypass Method (Tested July 2026)
+============================================
+Target: register.hfm.com (Next.js app behind Cloudflare)
+
+REQUIREMENTS
+------------
+- Node.js 18+
+- puppeteer-extra + puppeteer-extra-plugin-stealth
+- System Chromium (or any Chrome/Chromium binary)
+
+INSTALL
+-------
+  npm install puppeteer-extra puppeteer-extra-plugin-stealth
+
+USAGE
+-----
+  const puppeteer = require('puppeteer-extra');
+  const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+  puppeteer.use(StealthPlugin());
+
+  const browser = await puppeteer.launch({
+    headless: 'new',                    // KEY: new headless mode
+    executablePath: '/path/to/chromium', // use system Chrome
+    args: ['--no-sandbox']
+  });
+  const page = await browser.newPage();
+  await page.goto('https://register.hfm.com/int/en/new-live-account?refid=30489955',
+    { waitUntil: 'networkidle0' });
+
+KEY
+---
+  headless: 'new'  — Chrome's new headless mode (--headless=new)
+  puppeteer-extra-plugin-stealth — patches webdriver/navigator etc.
+
+FIELDS (Step 1)
+---------------
+  1. Email or Phone number  (text, name: email_or_phone)
+  2. Password               (password, name: password)
+  3. Register as: Corporate | Joint
+  4. iagree checkbox

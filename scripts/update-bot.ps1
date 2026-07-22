@@ -8,7 +8,8 @@ pip install -r requirements.txt
 pip install mplfinance
 
 Write-Host "`n=== Building frontend ===" -ForegroundColor Yellow
-cd C:\futures\web-app
+cd C:\futures-frontend
+git pull
 npm install
 npm run build
 

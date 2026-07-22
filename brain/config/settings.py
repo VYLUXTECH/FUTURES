@@ -40,14 +40,6 @@ LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO").upper()
 # ── Supabase Service Role (admin) ─────────────────────────
 SUPABASE_SERVICE_ROLE_KEY: str | None = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
-# ── Telegram Admin Bot ─────────────────────────────────────
-TELEGRAM_ADMIN_BOT_TOKEN: str | None = os.getenv("TELEGRAM_ADMIN_BOT_TOKEN")
-TELEGRAM_ADMIN_ID_1: int = int(os.getenv("TELEGRAM_ADMIN_ID_1", "0"))
-TELEGRAM_ADMIN_ID_2: int = int(os.getenv("TELEGRAM_ADMIN_ID_2", "0"))
-
-# ── Telegram (legacy) ──────────────────────────────────────
-TELEGRAM_BOT_TOKEN: str | None = os.getenv("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID: str | None = os.getenv("TELEGRAM_CHAT_ID")
 
 
 def validate_required() -> list[str]:

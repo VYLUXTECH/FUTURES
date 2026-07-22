@@ -11,7 +11,6 @@ numpy==1.26.4
 supabase==2.10.0
 psycopg2-binary==2.9.10
 requests==2.32.3
-python-telegram-bot==21.9
 mplfinance==0.12.10b0
 matplotlib==3.10.0
 reportlab==4.2.5

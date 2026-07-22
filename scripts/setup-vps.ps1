@@ -114,9 +114,7 @@ $supabaseKey = Read-Host "  SUPABASE_KEY (anon)"
 $supabaseDbUri = Read-Host "  SUPABASE_DB_URI"
 $supabaseServiceRole = Read-Host "  SUPABASE_SERVICE_ROLE_KEY"
 $supabaseJwt = Read-Host "  SUPABASE_JWT_SECRET"
-$telegramToken = Read-Host "  TELEGRAM_ADMIN_BOT_TOKEN (optional)"
-$telegramId1 = Read-Host "  TELEGRAM_ADMIN_ID_1 (optional)"
-$telegramId2 = Read-Host "  TELEGRAM_ADMIN_ID_2 (optional)"
+
 
 $lines = @(
     "# ============================================================"
@@ -146,11 +144,6 @@ $lines = @(
     ""
     "# --- Logging ---"
     "LOG_LEVEL=INFO"
-    ""
-    "# --- Telegram Admin Bot ---"
-    "TELEGRAM_ADMIN_BOT_TOKEN=$telegramToken"
-    "TELEGRAM_ADMIN_ID_1=$telegramId1"
-    "TELEGRAM_ADMIN_ID_2=$telegramId2"
 )
 
 $lines -join "`r`n" | Out-File -FilePath "$ROOT\.env" -Encoding ascii

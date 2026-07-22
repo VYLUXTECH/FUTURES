@@ -60,7 +60,7 @@ TOOL_DEFINITIONS: list[dict] = [
     },
     {
         "name": "explain_last_trade",
-        "description": "Get the reason/analysis for the most recent trade execution from the trading brain.",
+        "description": "Get a full 8-sector strategy breakdown for the most recent trade: candle pattern, market structure, key levels, rejection wick, imbalances, HTF bias, TF correlation, and bias synthesis with confidence score.",
         "parameters": {
             "type": "object",
             "properties": {},

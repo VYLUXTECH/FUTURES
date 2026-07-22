@@ -309,25 +309,79 @@ RESPOND naturally and conversationally. Do NOT output JSON or code unless callin
         except Exception as exc:
             return {"error": f"No market data for {symbol}: {exc}"}
 
+    @staticmethod
+    def _format_sector_explanation(sectors: dict) -> str:
+        lines = []
+        s1 = sectors.get("s1_candle", {})
+        s2 = sectors.get("s2_structure", {})
+        s3 = sectors.get("s3_levels", {})
+        s4 = sectors.get("s4_rejections", {})
+        s5 = sectors.get("s5_imbalances", {})
+        s6 = sectors.get("s6_htf", {})
+        s7 = sectors.get("s7_correlation", {})
+        s8 = sectors.get("s8_bias", {})
+
+        if s1:
+            mom = s1.get("momentum", "N/A")
+            press = s1.get("pressure", "N/A")
+            lines.append(f"1. Candle Pattern (S1): {s1.get('direction', 'N/A')} candle with {mom} momentum and {press} pressure.")
+        if s2:
+            lines.append(f"2. Market Structure (S2): Direction={s2.get('direction', 'N/A')}, Structure={s2.get('structure', 'N/A')}, Shift={'Yes' if s2.get('shift') else 'No'}.")
+        if s3:
+            levels = s3.get("key_levels", [])
+            mom_app = s3.get("momentum_of_approach", "N/A")
+            levels_str = ", ".join(f"${l:.5f}" for l in levels[:3])
+            lines.append(f"3. Key Levels (S3): Approach={mom_app}, Levels=[{levels_str}]. Ignore period={'Active' if s3.get('in_ignore') else 'Inactive'}.")
+        if s4:
+            wick = s4.get("wick_ratio", 0)
+            lines.append(f"4. Rejection (S4): {'Yes' if s4.get('rejection') else 'No'} at level ${s4.get('level', 0):.5f}, wick ratio={wick:.2f}.")
+        if s5:
+            fvg = "Present" if s5.get("fvg_found") else "None"
+            lines.append(f"5. Imbalances (S5): FVG={fvg}, Direction={s5.get('direction', 'N/A')}.")
+        if s6:
+            htfb = s6.get("htf_bias", "N/A")
+            strength = s6.get("strength", 0)
+            wb = s6.get("directional_bias", {}).get("weekly_bias", "N/A")
+            mb = s6.get("directional_bias", {}).get("monthly_bias", "N/A")
+            lines.append(f"6. HTF Structure (S6): Bias={htfb}, Strength={strength}, Weekly={wb}, Monthly={mb}.")
+        if s7:
+            align = s7.get("alignment", "N/A")
+            consensus = s7.get("direction_consensus", "N/A")
+            lines.append(f"7. TF Correlation (S7): Alignment={align}, Consensus={consensus}.")
+        if s8:
+            conf = s8.get("confidence", 0)
+            align_s8 = s8.get("alignment", "N/A")
+            sl = s8.get("sl_pips", 0)
+            be = s8.get("be_trigger", 0)
+            lines.append(f"8. Bias Synthesis (S8): Confidence={conf}%, Alignment={align_s8}, SL={sl:.1f}pips, BE trigger=${be:.5f}.")
+
+        return "\n".join(lines)
+
     async def _tool_explain_last_trade(self, _args: dict, user_id: str) -> dict:
         trades = get_recent_trades(limit=1, user_id=user_id)
         if not trades:
             return {"message": "No trades have been executed yet."}
         t = trades[0]
         sectors_raw = t.get("sectors_json")
-        reason = "No detailed reason recorded."
+        explanation = "No detailed reason recorded."
         if sectors_raw:
             try:
                 parsed = json.loads(sectors_raw) if isinstance(sectors_raw, str) else sectors_raw
-                reason = parsed.get("s8_bias", {}).get("reason") or json.dumps(parsed, indent=2)[:500]
+                explanation = self._format_sector_explanation(parsed)
             except (json.JSONDecodeError, TypeError):
                 pass
         return {
             "pair": t.get("pair", ""),
             "direction": t.get("direction", ""),
             "entry": t.get("entry_price", 0),
+            "sl": t.get("sl_price", 0),
+            "tp": t.get("tp_price", 0),
             "pnl": round(t.get("pnl", 0), 2),
-            "reason": reason,
+            "status": t.get("status", ""),
+            "lots": t.get("lots", 0),
+            "opened_at": t.get("opened_at", ""),
+            "closed_at": t.get("closed_at", ""),
+            "explanation": explanation,
         }
 
     async def _tool_generate_chart(self, args: dict, _user_id: str) -> dict:

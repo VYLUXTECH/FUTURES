@@ -5,7 +5,7 @@
 #   1. Windows VPS (this one: 158.220.89.163)
 #   2. Supabase project created with db.txt schema
 #   3. Domain bot.futuretraders.net on Cloudflare
-#   4. Your Supabase + Telegram credentials ready
+#   4. Your Supabase credentials ready
 #
 # Before running: delete any DNS A record for bot.futuretraders.net
 
