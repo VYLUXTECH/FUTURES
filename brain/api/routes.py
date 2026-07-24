@@ -555,17 +555,17 @@ class SupportTicketRequest(BaseModel):
 
 
 def _decode_jwt(request: Request) -> dict:
-    import base64
-    import json
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
         return {}
     token = auth.split(" ", 1)[1]
     try:
-        from backend.api.middleware import decode_jwt_payload
-        return decode_jwt_payload(token)
+        from backend.auth.jwt import decode_access_token
+        return decode_access_token(token) or {}
     except ImportError:
         pass
+    import base64
+    import json
     try:
         payload_b64 = token.split(".")[1]
         padded = payload_b64 + "=" * (4 - len(payload_b64) % 4)

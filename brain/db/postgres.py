@@ -67,6 +67,15 @@ def init_db(uri: str | None = None) -> None:
                     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
                 )
             """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    email         VARCHAR(255) UNIQUE NOT NULL,
+                    password_hash VARCHAR(255) NOT NULL,
+                    display_name  VARCHAR(255) DEFAULT '',
+                    created_at    TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
             conn.commit()
         logger.info("Database tables initialised")
     except Exception as exc:
