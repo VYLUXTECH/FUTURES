@@ -1,19 +1,26 @@
 FUTURES Trading Bot - Fresh VPS Setup
 ======================================
 
-Run these commands in PowerShell as Administrator:
+Open PowerShell as Administrator and paste these 3 lines:
 
 Set-ExecutionPolicy RemoteSigned -Scope Process -Force
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/VYLUXTECH/FUTURES/main/scripts/fresh-setup.ps1" -OutFile "$env:TEMP\setup.ps1"
-& "$env:TEMP\setup.ps1"
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/VYLUXTECH/FUTURES/main/scripts/fresh-setup.ps1" -OutFile "$env:TEMP\go.ps1"
+& "$env:TEMP\go.ps1"
 
 It will ask for:
-1. SUPABASE_DB_URI - PostgreSQL connection string
-2. SUPABASE_URL - e.g. https://uelvridbdykdfqqoihcc.supabase.co
-3. SUPABASE_KEY - service role key
+1. SUPABASE_DB_URI (PostgreSQL connection string)
+2. SUPABASE_URL (e.g. https://uelvridbdykdfqqoihcc.supabase.co)
+3. SUPABASE_KEY (service role key)
 
-After setup, login:
+After setup:
+  URL:      https://bot.futuretraders.net
   Email:    ssegawarichie72@gmail.com
   Password: #RichieRich206
 
-URL: https://bot.futuretraders.net
+Services:
+  nssm start FuturesBot
+  nssm stop FuturesBot
+  nssm restart FuturesBot
+
+Logs:
+  C:\futures\brain\logs\futuresbrain.log
