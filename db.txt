@@ -1,5 +1,5 @@
 -- ============================================================
--- FUTURES Trading Bot — Supabase Database Setup
+-- THE DISCIPLE Trading Bot — Supabase Database Setup
 -- Run this in Supabase SQL Editor
 -- ============================================================
 

@@ -1,5 +1,5 @@
 # ============================================================
-# FuturesBrain v2.0 – Supabase Trade & State Persistence
+# TheDisciple v2.0 – Supabase Trade & State Persistence
 # Uses Transaction Pooler (port 6543, IPv4-compatible).
 # All operations are fire-and-forget from background threads.
 # ============================================================

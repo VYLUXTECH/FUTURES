@@ -1,5 +1,5 @@
 # ============================================================
-# FuturesBrain v1.0 – Market Data Feed
+# TheDisciple v1.0 – Market Data Feed
 # All functions are SYNCHRONOUS – call from the MT5 thread only.
 # BUG FIXES:
 #   • DataFrame index construction was broken (pd.Series(rates)['time'])

@@ -19,7 +19,7 @@ _PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
-# ── FuturesBrain imports ───────────────────────────────
+# ── TheDisciple imports ───────────────────────────────
 from brain.utils.logger import setup_logging
 from brain.config.settings import (
     SUPABASE_DB_URI, validate_required,
@@ -44,7 +44,7 @@ from backend.ai import CopilotEngine, MarketSummaryEngine, ChartGenerator
 from backend.db.supabase import get_client
 
 setup_logging()
-logger = logging.getLogger("futures.app")
+logger = logging.getLogger("thedisciple.app")
 
 # ── Globals ──────────────────────────────────────────────
 _stop_event = threading.Event()

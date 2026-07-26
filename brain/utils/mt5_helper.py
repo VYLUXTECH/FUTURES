@@ -1,5 +1,5 @@
 # ============================================================
-# FuturesBrain v1.0 – MT5 Helper Utilities
+# TheDisciple v1.0 – MT5 Helper Utilities
 # All functions are SYNCHRONOUS – call from the MT5 thread only.
 # ============================================================
 from __future__ import annotations

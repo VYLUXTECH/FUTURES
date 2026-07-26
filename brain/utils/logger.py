@@ -1,5 +1,5 @@
 # ============================================================
-# FuturesBrain v1.0 – Centralised Logger
+# TheDisciple v1.0 – Centralised Logger
 # Call setup_logging() ONCE from main.py. All other modules
 # just use logging.getLogger(__name__).
 # ============================================================
@@ -12,7 +12,7 @@ from brain.config.settings import LOG_LEVEL, BASE_DIR
 
 def setup_logging() -> None:
     """Configure root logger. Must be called exactly once at startup."""
-    log_file = BASE_DIR / "logs" / "futuresbrain.log"
+    log_file = BASE_DIR / "logs" / "thedisciple.log"
 
     fmt = "%(asctime)s [%(levelname)-8s] %(name)s: %(message)s"
     date_fmt = "%Y-%m-%d %H:%M:%S"

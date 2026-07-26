@@ -1,10 +1,10 @@
-# Wipes C:\futures-bot / C:\futures, clones fresh, and runs local setup-vps.ps1 (with Cloudflare headless fix)
-# Run in PowerShell as Administrator
-$ROOT = "C:\futures"
+# Wipes C:\thedisciple, clones fresh, and runs local setup-vps.ps1
+
+$ROOT = "C:\thedisciple"
 $REPO = "https://github.com/VYLUXTECH/FUTURES.git"
 
-Set-Location C:\
-Remove-Item -Recurse -Force "C:\futures-bot" -ErrorAction SilentlyContinue
+# Clean old dirs
+Remove-Item -Recurse -Force "C:\thedisciple-bot" -ErrorAction SilentlyContinue
 if (Test-Path $ROOT) {
     $retries = 5
         while ($retries -gt 0 -and (Test-Path $ROOT)) {

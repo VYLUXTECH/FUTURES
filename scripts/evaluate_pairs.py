@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FUTURES Trading Bot — Pair Evaluation Backtest
+THE DISCIPLE Trading Bot - Pair Evaluation Backtest
 Tests ALL 8 supported pairs to determine which meet:
   1. ≥5 trade signals per day (during session hours)
   2. >25% win rate (break-even for 1:3 RR)

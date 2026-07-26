@@ -1,1 +1,1 @@
-Get-Content "C:\futures\brain\logs\futuresbrain.log" -Tail 80
+Get-Content "C:\thedisciple\brain\logs\thedisciple.log" -Tail 80

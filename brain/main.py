@@ -22,7 +22,7 @@ from brain.utils.mt5_helper import reconnect_mt5, is_connected
 from brain.utils.logger import setup_logging
 
 setup_logging()
-logger = logging.getLogger("futuresbrain.main")
+logger = logging.getLogger("thedisciple.main")
 
 _stop_event = threading.Event()
 _bot_state: dict = {
@@ -349,7 +349,7 @@ _bot_state["_start_trading"] = _start_trading_thread
 
 
 def create_app() -> FastAPI:
-    """Build and return the standalone FuturesBrain FastAPI app."""
+    """Build and return the standalone TheDisciple FastAPI app."""
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
     from brain.api.routes import router
@@ -357,7 +357,7 @@ def create_app() -> FastAPI:
     ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:8081").split(",") if o.strip()]
 
     app = FastAPI(
-        title="FuturesBrain API",
+        title="THE DISCIPLE API",
         version="2.0.0",
         description="Price Action S/R Scalping Bot — 1:3 RR",
     )
@@ -380,7 +380,7 @@ def create_app() -> FastAPI:
             logger.warning("Missing required env vars: %s — API running without trading loop", missing)
 
         _start_trading_thread()
-        logger.info("FuturesBrain v2.0 multi-user API started")
+        logger.info("THE DISCIPLE v2.0 multi-user API started")
 
     @app.on_event("shutdown")
     async def shutdown_event() -> None:

@@ -6,8 +6,8 @@
 #>
 
 $ErrorActionPreference = "Stop"
-$ROOT = "C:\futures"
-$FRONTEND = "C:\futures-frontend"
+$ROOT = "C:\thedisciple"
+$FRONTEND = "C:\thedisciple-frontend"
 
 Write-Host "=== THE DISCIPLE Fresh Setup ===" -ForegroundColor Cyan
 Write-Host ""
@@ -115,5 +115,5 @@ Write-Host "Email:    ssegawarichie72@gmail.com" -ForegroundColor White
 Write-Host "Password: #RichieRich206" -ForegroundColor White
 Write-Host ""
 Write-Host "Next: Set up Cloudflare tunnel to point to localhost:8000" -ForegroundColor Yellow
-Write-Host "Then: nssm install FuturesBot python backend/main.py" -ForegroundColor Yellow
-Write-Host "      nssm start FuturesBot" -ForegroundColor Yellow
+Write-Host "Then: nssm install TheDisciple python backend/main.py" -ForegroundColor Yellow
+Write-Host "      nssm start TheDisciple" -ForegroundColor Yellow

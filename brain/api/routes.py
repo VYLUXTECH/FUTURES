@@ -1,5 +1,5 @@
 # ============================================================
-# FuturesBrain v1.0 – FastAPI Routes
+# TheDisciple v1.0 – FastAPI Routes
 # Endpoints aligned with frontend (dashboard, copilot, mt5, settings).
 # NEVER executes trades directly – only reads state and proxies copilot.
 # ============================================================

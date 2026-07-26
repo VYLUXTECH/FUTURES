@@ -1,9 +1,9 @@
-# Finds futuresbrain.log and shows last 50 relevant Signal/Pipeline lines
+# Finds thedisciple.log and shows last 50 relevant Signal/Pipeline lines
 $possible = @(
-    ".\brain\logs\futuresbrain.log",
-    "..\brain\logs\futuresbrain.log",
-    "$env:USERPROFILE\FUTURES-TRADING-BOT\brain\logs\futuresbrain.log",
-    "$env:USERPROFILE\FUTURES\brain\logs\futuresbrain.log"
+    ".\brain\logs\thedisciple.log",
+    "..\brain\logs\thedisciple.log",
+    "$env:USERPROFILE\THE-DISCIPLE\brain\logs\thedisciple.log",
+    "$env:USERPROFILE\thedisciple\brain\logs\thedisciple.log"
 )
 
 $log = $null
@@ -13,11 +13,11 @@ foreach ($p in $possible) {
 
 if (-not $log) {
     Write-Host "Log file not found. Searching drives..." -ForegroundColor Yellow
-    $log = Get-ChildItem -Path C:\ -Recurse -Filter "futuresbrain.log" -ErrorAction SilentlyContinue -Depth 5 | Select-Object -First 1 -ExpandProperty FullName
+    $log = Get-ChildItem -Path C:\ -Recurse -Filter "thedisciple.log" -ErrorAction SilentlyContinue -Depth 5 | Select-Object -First 1 -ExpandProperty FullName
 }
 
 if (-not $log) {
-    Write-Host "ERROR: futuresbrain.log not found anywhere." -ForegroundColor Red
+    Write-Host "ERROR: thedisciple.log not found anywhere." -ForegroundColor Red
     exit 1
 }
 

@@ -1,5 +1,5 @@
 # ============================================================
-# FuturesBrain v1.0 – Settings (Environment Variables)
+# TheDisciple v1.0 – Settings (Environment Variables)
 # Uses pydantic-settings for type-safe env loading.
 # ============================================================
 from __future__ import annotations

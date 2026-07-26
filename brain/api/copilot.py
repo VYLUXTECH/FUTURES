@@ -1,5 +1,5 @@
 # ============================================================
-# FuturesBrain v1.0 – AI Copilot Endpoint (Gemini + HF Vision)
+# TheDisciple v1.0 – AI Copilot Endpoint (Gemini + HF Vision)
 # Uses Gemini via nexray for text analysis and
 # Qwen-VL via HuggingFace Inference API for chart vision.
 # ============================================================
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 COPILOT_CACHE_TTL: int = 300        # 5 minutes
 RATE_LIMIT_PER_HOUR: int = 15
 
-_SYSTEM_PROMPT = """You are FuturesBrain Copilot, a read-only trading analyst.
+_SYSTEM_PROMPT = """You are THE DISCIPLE Copilot, a read-only trading analyst.
 You analyse forex charts and provide structured JSON insights.
 CRITICAL: You NEVER suggest trade execution. You NEVER output order commands.
 You only analyse and explain what you see.

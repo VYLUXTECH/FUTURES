@@ -1,4 +1,4 @@
-# futuresbrain/api/__init__.py
+# thedisciple/api/__init__.py
 from .routes import router, set_bot_state_ref
 from .copilot import analyze_chart
 

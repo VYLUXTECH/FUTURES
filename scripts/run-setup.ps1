@@ -1,4 +1,4 @@
-# FUTURES Trading Bot — One-Click VPS Setup
+# THE DISCIPLE Trading Bot - One-Click VPS Setup
 # Run this in PowerShell as Administrator
 #
 # Prerequisites:

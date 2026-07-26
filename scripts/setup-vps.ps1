@@ -7,7 +7,7 @@
 #>
 
 $ErrorActionPreference = "Stop"
-$ROOT = "C:\futures"
+$ROOT = "C:\thedisciple"
 $REPO = "https://github.com/VYLUXTECH/FUTURES.git"
 
 Write-Host "========================================" -ForegroundColor Cyan
@@ -174,7 +174,7 @@ if (Test-Path "$env:USERPROFILE\.cloudflared\cert.pem") {
     cloudflared tunnel login 2>&1 | ForEach-Object { Write-Host $_ }
 }
 
-$tunnelName = "futures-bot"
+$tunnelName = "thedisciple-bot"
 Write-Host "  Creating tunnel '$tunnelName'..." -ForegroundColor Yellow
 $tunnelResult = cloudflared tunnel create $tunnelName 2>&1 | Out-String
 Write-Host $tunnelResult
@@ -185,7 +185,7 @@ if ($tunnelResult -match "id\s+(\S+)") {
 } elseif ($tunnelResult -match "already exists") {
     Write-Host "  Tunnel already exists. Fetching ID..." -ForegroundColor Yellow
     $listResult = cloudflared tunnel list 2>&1 | Out-String
-    if ($listResult -match "futures-bot\s+(\S+)") {
+    if ($listResult -match "thedisciple-bot\s+(\S+)") {
         $tunnelId = $matches[1]
     }
 }
@@ -235,21 +235,21 @@ if (-not (Test-Path "$nssmDir\nssm.exe")) {
 
 $pyPath = (Get-Command python).Source
 
-& "$nssmDir\nssm.exe" install FuturesBot @"
+& "$nssmDir\nssm.exe" install TheDisciple @"
 $pyPath
 "@ 2>&1 | Out-Null
-& "$nssmDir\nssm.exe" set FuturesBot AppParameters "backend/main.py"
-& "$nssmDir\nssm.exe" set FuturesBot AppDirectory "$ROOT"
-& "$nssmDir\nssm.exe" set FuturesBot DisplayName "THE DISCIPLE Trading Bot"
-& "$nssmDir\nssm.exe" set FuturesBot Description "AI-Powered Forex Trading Bot"
-& "$nssmDir\nssm.exe" set FuturesBot Start SERVICE_AUTO_START
+& "$nssmDir\nssm.exe" set TheDisciple AppParameters "backend/main.py"
+& "$nssmDir\nssm.exe" set TheDisciple AppDirectory "$ROOT"
+& "$nssmDir\nssm.exe" set TheDisciple DisplayName "THE DISCIPLE Trading Bot"
+& "$nssmDir\nssm.exe" set TheDisciple Description "AI-Powered Forex Trading Bot"
+& "$nssmDir\nssm.exe" set TheDisciple Start SERVICE_AUTO_START
 Write-Host "  Bot service registered." -ForegroundColor Green
 
 # ---- Start everything ----------------------------------------------
 Write-Host ""
 Write-Host "[8/8] Starting services..." -ForegroundColor Yellow
 
-& "$nssmDir\nssm.exe" start FuturesBot
+& "$nssmDir\nssm.exe" start TheDisciple
 net start cloudflared 2>$null
 
 Write-Host ""
@@ -261,11 +261,11 @@ Write-Host "  Your bot is running at:" -ForegroundColor White
 Write-Host "  https://bot.futuretraders.net" -ForegroundColor Green
 Write-Host ""
 Write-Host "  Service management:" -ForegroundColor White
-Write-Host "  nssm start/stop/restart FuturesBot" -ForegroundColor Yellow
+Write-Host "  nssm start/stop/restart TheDisciple" -ForegroundColor Yellow
 Write-Host "  net start/stop cloudflared" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "  To view bot logs:" -ForegroundColor White
-Write-Host "  nssm edit FuturesBot -> I/O tab" -ForegroundColor Yellow
+Write-Host "  nssm edit TheDisciple -> I/O tab" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "  Credits:" -ForegroundColor Magenta
 Write-Host "  VYLUX TECH - Development and Architecture" -ForegroundColor Magenta

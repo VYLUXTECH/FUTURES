@@ -1,4 +1,4 @@
-# futuresbrain/core/__init__.py
+# thedisciple/core/__init__.py
 from .risk import RiskEngine
 from .pipeline import run
 from .executor import place_order, close_position, modify_sl_to_break_even, update_trailing_stop

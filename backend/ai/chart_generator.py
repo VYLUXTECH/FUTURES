@@ -126,7 +126,7 @@ class ChartGenerator:
                      fontsize=12, fontweight="bold")
 
         # Save to temp file
-        out_dir = os.path.join(tempfile.gettempdir(), "futures_charts")
+        out_dir = os.path.join(tempfile.gettempdir(), "thedisciple_charts")
         os.makedirs(out_dir, exist_ok=True)
         out_path = os.path.join(out_dir, f"{pair}_{tf}_{int(datetime.utcnow().timestamp())}.png")
         fig.savefig(out_path, dpi=120, bbox_inches="tight")

@@ -1,5 +1,5 @@
 # ============================================================
-# FuturesBrain v1.0 – Thread-Safe In-Memory Cache
+# TheDisciple v1.0 – Thread-Safe In-Memory Cache
 # Used by copilot endpoint (5-min TTL per spec).
 # ============================================================
 from __future__ import annotations

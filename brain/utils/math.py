@@ -1,5 +1,5 @@
 # ============================================================
-# FuturesBrain v1.0 – Math Utilities
+# TheDisciple v1.0 – Math Utilities
 # ============================================================
 from __future__ import annotations
 

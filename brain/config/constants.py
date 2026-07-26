@@ -1,12 +1,12 @@
 # ============================================================
-# FuturesBrain v1.0 – Strategy Constants (Ground Truth)
+# TheDisciple v1.0 – Strategy Constants (Ground Truth)
 # ALL risk rules, pip sizes, thresholds defined here.
 # DO NOT change without updating the strategy spec.
 # ============================================================
 from __future__ import annotations
 
 VERSION: str = "1.0.0"
-APP_NAME: str = "FuturesBrain"
+APP_NAME: str = "TheDisciple"
 
 # ── Supported Instruments ──────────────────────────────────
 # Original 3: GBPUSD, GBPJPY, USDJPY

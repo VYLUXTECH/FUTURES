@@ -1,4 +1,4 @@
-# futuresbrain/db/__init__.py
+# thedisciple/db/__init__.py
 from .supabase import (
     sync_trade, test_connection,
     get_recent_trades, get_open_trades,

@@ -18,9 +18,9 @@ After setup:
   Password: #RichieRich206
 
 Services:
-  nssm start FuturesBot
-  nssm stop FuturesBot
-  nssm restart FuturesBot
+  nssm start TheDisciple
+  nssm stop TheDisciple
+  nssm restart TheDisciple
 
 Logs:
-  C:\futures\brain\logs\futuresbrain.log
+  C:\thedisciple\brain\logs\thedisciple.log
