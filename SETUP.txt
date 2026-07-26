@@ -1,4 +1,4 @@
-FUTURES Trading Bot - Fresh VPS Setup
+THE DISCIPLE - Fresh VPS Setup
 ======================================
 
 Open PowerShell as Administrator and paste these 3 lines:

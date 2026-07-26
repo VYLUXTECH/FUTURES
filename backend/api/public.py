@@ -11,7 +11,7 @@ router = APIRouter()
 
 @router.get("/api/health")
 async def root() -> dict:
-    return {"message": "FUTURES Trading Bot API is running"}
+    return {"message": "THE DISCIPLE Trading Bot API is running"}
 
 
 @router.get("/api/config")

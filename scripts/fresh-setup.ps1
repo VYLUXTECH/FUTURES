@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  FUTURES - Fresh VPS Setup
+  THE DISCIPLE - Fresh VPS Setup
 .DESCRIPTION
   Run as Administrator in PowerShell on a new VPS.
 #>
@@ -9,7 +9,7 @@ $ErrorActionPreference = "Stop"
 $ROOT = "C:\futures"
 $FRONTEND = "C:\futures-frontend"
 
-Write-Host "=== FUTURES Fresh Setup ===" -ForegroundColor Cyan
+Write-Host "=== THE DISCIPLE Fresh Setup ===" -ForegroundColor Cyan
 Write-Host ""
 
 # Admin check

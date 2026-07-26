@@ -178,7 +178,7 @@ def simulate_trade(df_future, signal, pip_size, lookahead=200):
 # ── Main Evaluation ────────────────────────────────────────
 def evaluate_pairs():
     print("=" * 80)
-    print("  FUTURES Trading Bot — Pair Evaluation Backtest")
+    print("  THE DISCIPLE Trading Bot — Pair Evaluation Backtest")
     print("  Tests: Signal frequency, Win rate, Expectancy per pair")
     print("  Target: ≥5 signals/day, >25% WR (1:3 RR break-even)")
     print("=" * 80)

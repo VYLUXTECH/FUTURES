@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  FUTURES Trading Bot - One-Click VPS Setup
+  THE DISCIPLE - One-Click VPS Setup
 .DESCRIPTION
   Automates: Python, dependencies, .env, Cloudflare Tunnel, services, and startup.
   Run this on a fresh Windows VPS as Administrator.
@@ -11,7 +11,7 @@ $ROOT = "C:\futures"
 $REPO = "https://github.com/VYLUXTECH/FUTURES.git"
 
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "   FUTURES Trading Bot - VPS Setup" -ForegroundColor Cyan
+Write-Host "   THE DISCIPLE - VPS Setup" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -118,7 +118,7 @@ $supabaseJwt = Read-Host "  SUPABASE_JWT_SECRET"
 
 $lines = @(
     "# ============================================================"
-    "# FUTURES - Production Environment Variables"
+    "# THE DISCIPLE - Production Environment Variables"
     "# ============================================================"
     ""
     "# --- API Server ---"
@@ -240,7 +240,7 @@ $pyPath
 "@ 2>&1 | Out-Null
 & "$nssmDir\nssm.exe" set FuturesBot AppParameters "backend/main.py"
 & "$nssmDir\nssm.exe" set FuturesBot AppDirectory "$ROOT"
-& "$nssmDir\nssm.exe" set FuturesBot DisplayName "FUTURES Trading Bot"
+& "$nssmDir\nssm.exe" set FuturesBot DisplayName "THE DISCIPLE Trading Bot"
 & "$nssmDir\nssm.exe" set FuturesBot Description "AI-Powered Forex Trading Bot"
 & "$nssmDir\nssm.exe" set FuturesBot Start SERVICE_AUTO_START
 Write-Host "  Bot service registered." -ForegroundColor Green

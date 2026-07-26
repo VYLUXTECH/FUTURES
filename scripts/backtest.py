@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FUTURES Trading Bot — Comprehensive Backtest Engine
+THE DISCIPLE Trading Bot — Comprehensive Backtest Engine
 Uses real 15min candle data (Dukascopy 2024-2026, ~58k candles/pair).
 Tests both BUY and SELL signals with proper HTF bias matching.
 """
@@ -294,7 +294,7 @@ def simulate_trade(df_future, signal, pip_size, lookahead=200):
 # ── Main Backtest ──────────────────────────────────────────
 def run_backtest():
     print("=" * 70)
-    print("  FUTURES Trading Bot — Comprehensive Backtest")
+    print("  THE DISCIPLE Trading Bot — Comprehensive Backtest")
     print("  Dukascopy 15m Data | 3 Pairs | 1:3 RR | BUY+SELL | 8-Sector Pipeline")
     print("=" * 70)
     print()

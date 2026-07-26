@@ -84,7 +84,7 @@ async def lifespan(app: FastAPI):
             daemon=False,
         )
         _trading_thread.start()
-        logger.info("FUTURES trading engine started")
+        logger.info("THE DISCIPLE trading engine started")
 
     yield
 
@@ -109,14 +109,14 @@ async def lifespan(app: FastAPI):
         logger.info("Trading engine restarted")
         return  # keep the bot running; lifespan continues until actual shutdown
 
-    logger.info("FUTURES shutting down...")
+    logger.info("THE DISCIPLE shutting down...")
 
 
 # ── FastAPI App ──────────────────────────────────────────
 app = FastAPI(
-    title="FUTURES",
+    title="THE DISCIPLE",
     version="1.0.0",
-    description="AI-Powered Futures/Forex Trading Bot",
+    description="AI-Powered Futures/Forex Trading Bot by Richie Rich",
     lifespan=lifespan,
 )
 
