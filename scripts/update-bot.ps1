@@ -1,6 +1,6 @@
 Write-Host "=== Pulling latest changes ===" -ForegroundColor Yellow
 cd C:\thedisciple
-git remote set-url origin https://github.com/VYLUXTECH/FUTURES.git 2>$null
+git remote set-url origin https://github.com/VYLUXTECH/THE-DISCIPLE.git 2>$null
 git pull
 
 Write-Host "`n=== Installing Python deps ===" -ForegroundColor Yellow

@@ -1,7 +1,7 @@
 # Wipes C:\thedisciple, clones fresh, and runs local setup-vps.ps1
 
 $ROOT = "C:\thedisciple"
-$REPO = "https://github.com/VYLUXTECH/FUTURES.git"
+$REPO = "https://github.com/VYLUXTECH/THE-DISCIPLE.git"
 
 # Clean old dirs
 Remove-Item -Recurse -Force "C:\thedisciple-bot" -ErrorAction SilentlyContinue

@@ -51,7 +51,7 @@ Write-Host "[4/7] Cloning backend..." -ForegroundColor Yellow
 try { taskkill /F /IM python.exe 2>&1 | Out-Null } catch {}
 Start-Sleep 2
 if (Test-Path $ROOT) { Remove-Item -Recurse -Force $ROOT -ErrorAction SilentlyContinue }
-git clone https://github.com/VYLUXTECH/FUTURES.git $ROOT
+git clone https://github.com/VYLUXTECH/THE-DISCIPLE.git $ROOT
 
 # Clone frontend
 Write-Host "[5/7] Cloning frontend..." -ForegroundColor Yellow

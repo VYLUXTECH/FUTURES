@@ -1,9 +1,11 @@
 <h1 align="center">THE DISCIPLE</h1>
 
 <p align="center">
+  <i>"Embrace the eccentricity of price"</i>
+</p>
+
+<p align="center">
   <b>AI-Powered Automated Forex Trading Platform</b>
-  <br>
-  Built for precision. Driven by intelligence. Designed for scale.
 </p>
 
 <p align="center">

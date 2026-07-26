@@ -8,7 +8,7 @@
 
 $ErrorActionPreference = "Stop"
 $ROOT = "C:\thedisciple"
-$REPO = "https://github.com/VYLUXTECH/FUTURES.git"
+$REPO = "https://github.com/VYLUXTECH/THE-DISCIPLE.git"
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "   THE DISCIPLE - VPS Setup" -ForegroundColor Cyan

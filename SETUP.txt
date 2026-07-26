@@ -4,7 +4,7 @@ THE DISCIPLE - Fresh VPS Setup
 Open PowerShell as Administrator and paste these 3 lines:
 
 Set-ExecutionPolicy RemoteSigned -Scope Process -Force
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/VYLUXTECH/FUTURES/main/scripts/fresh-setup.ps1" -OutFile "$env:TEMP\go.ps1"
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/VYLUXTECH/THE-DISCIPLE/main/scripts/fresh-setup.ps1" -OutFile "$env:TEMP\go.ps1"
 & "$env:TEMP\go.ps1"
 
 It will ask for:
