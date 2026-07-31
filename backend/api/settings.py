@@ -9,8 +9,18 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from brain.db.postgres import get_recent_trades
-from backend.db.supabase import get_client
+from brain.db.postgres import (
+    get_recent_trades,
+    get_profile as db_get_profile,
+    update_profile as db_update_profile,
+    get_user_settings as db_get_user_settings,
+    upsert_user_settings_dict as db_upsert_user_settings_dict,
+    get_mt5_accounts as db_get_mt5_accounts,
+    get_mt5_credentials as db_get_mt5_credentials,
+    save_mt5_credentials as db_save_mt5_credentials,
+    update_mt5_credentials as db_update_mt5_credentials,
+    delete_mt5_credentials as db_delete_mt5_credentials,
+)
 from backend.api.middleware import require_auth
 
 logger = logging.getLogger(__name__)
@@ -36,35 +46,27 @@ class SettingsUpdate(BaseModel):
 
 @router.get("/settings")
 async def get_settings(request: Request, user: dict = Depends(require_auth)) -> dict:
-    client = get_client()
-    if not client:
-        return _default_settings()
     user_id = user.get("sub")
     if not user_id:
         return _default_settings()
     try:
-        res = client.table("profiles").select("*").eq("id", user_id).maybe_single().execute()
-        if res.data:
-            profile = res.data if isinstance(res.data, dict) else {}
-            max_daily = 5
-            try:
-                settings_res = client.table("user_settings").select("max_daily_trades").eq("user_id", user_id).maybe_single().execute()
-                if settings_res.data:
-                    max_daily = settings_res.data.get("max_daily_trades", 5)
-            except Exception:
-                pass
-            return {
-                "risk_percent": profile.get("risk_percent", 5.0),
-                "be_policy": profile.get("be_policy", "auto"),
-                "dry_run": profile.get("dry_run", False),
-                "auto_compounding": profile.get("auto_compounding", False),
-                "display_name": profile.get("display_name", "Trader"),
-                "max_daily_trades": max_daily,
-                "notifications": profile.get("notifications", {
-                    "trade_execution": True, "trade_closed": True, "daily_summary": True,
-                    "loss_cooldown": True, "maintenance": True, "email_trade": False,
-                }),
-            }
+        profile = db_get_profile(user_id)
+        if not profile:
+            return _default_settings()
+        settings = db_get_user_settings(user_id) or {}
+        max_daily = settings.get("max_daily_trades", 5) or 5
+        return {
+            "risk_percent": profile.get("risk_percent", 5.0),
+            "be_policy": profile.get("be_policy", "auto"),
+            "dry_run": profile.get("dry_run", False),
+            "auto_compounding": profile.get("auto_compounding", False),
+            "display_name": profile.get("display_name", "Trader"),
+            "max_daily_trades": max_daily,
+            "notifications": profile.get("notifications") or {
+                "trade_execution": True, "trade_closed": True, "daily_summary": True,
+                "loss_cooldown": True, "maintenance": True, "email_trade": False,
+            },
+        }
     except Exception as e:
         logger.warning("Failed to fetch settings: %s", e)
 
@@ -89,14 +91,6 @@ def _default_settings() -> dict:
 
 @router.post("/settings")
 async def update_settings(req: SettingsUpdate, user: dict = Depends(require_auth)) -> dict:
-    client = get_client()
-    if not client:
-        if _bot_state_ref is not None and req.risk_percent is not None:
-            _bot_state_ref["risk_percent"] = req.risk_percent
-        if _bot_state_ref is not None and req.max_daily_trades is not None:
-            _bot_state_ref["max_daily_trades"] = req.max_daily_trades
-        return {"status": "updated", "note": "in-memory only (no supabase)"}
-
     user_id = user.get("sub")
     if not user_id:
         return {"status": "error", "note": "no user"}
@@ -112,20 +106,12 @@ async def update_settings(req: SettingsUpdate, user: dict = Depends(require_auth
         _bot_state_ref["max_daily_trades"] = req.max_daily_trades
 
     if updates:
-        try:
-            client.table("profiles").update(updates).eq("id", user_id).execute()
-        except Exception as e:
-            logger.warning("Failed to update settings: %s", e)
+        if not db_update_profile(user_id, updates):
+            logger.warning("Failed to update settings for %s", user_id)
             return {"status": "updated", "note": "in-memory only"}
 
     if req.max_daily_trades is not None:
-        try:
-            client.table("user_settings").upsert(
-                {"user_id": user_id, "max_daily_trades": req.max_daily_trades},
-                on_conflict="user_id",
-            ).execute()
-        except Exception as e:
-            logger.warning("Failed to update user_settings: %s", e)
+        db_upsert_user_settings_dict(user_id, {"max_daily_trades": req.max_daily_trades})
 
     return {"status": "updated"}
 
@@ -141,16 +127,13 @@ class MT5CredentialsUpdate(BaseModel):
 @router.get("/mt5/credentials")
 async def get_mt5_credentials(user: dict = Depends(require_auth)) -> dict:
     """Return the user's saved MT5 credentials (no password)."""
-    client = get_client()
-    if not client:
-        return {"error": "Supabase not configured"}
     user_id = user.get("sub")
     if not user_id:
         return {"login": None, "server": None, "connected": False}
     try:
-        res = client.table("mt5_credentials").select("login, server, connected, automated_trading_enabled, last_error, last_connected_at").eq("user_id", user_id).maybe_single().execute()
-        if res.data:
-            return res.data
+        rows = db_get_mt5_credentials(user_id)
+        if rows:
+            return rows[0]
     except Exception as e:
         logger.warning("Failed to fetch MT5 credentials: %s", e)
     return {"login": None, "server": None, "connected": False}
@@ -159,9 +142,6 @@ async def get_mt5_credentials(user: dict = Depends(require_auth)) -> dict:
 @router.post("/mt5/credentials")
 async def save_mt5_credentials(req: MT5CredentialsUpdate, user: dict = Depends(require_auth)) -> dict:
     """Save full MT5 credentials (used by web signup page). Password is encrypted."""
-    client = get_client()
-    if not client:
-        return {"error": "Supabase not configured"}
     user_id = user.get("sub")
     if not user_id:
         return {"error": "not authenticated"}
@@ -173,10 +153,10 @@ async def save_mt5_credentials(req: MT5CredentialsUpdate, user: dict = Depends(r
         is_demo = "demo" in req.server.lower()
         account_type = "demo" if is_demo else "real"
 
-        existing = client.table("mt5_credentials").select("login,server").eq("user_id", user_id).execute()
-        if existing.data:
+        existing = db_get_mt5_accounts(user_id)
+        if existing:
             same_type = [
-                e for e in existing.data
+                e for e in existing
                 if ("demo" in (e.get("server") or "").lower()) == is_demo
                 and (e.get("server") or "").lower() != req.server.lower()
                 and str(e.get("login", "")) != str(req.login)
@@ -185,13 +165,14 @@ async def save_mt5_credentials(req: MT5CredentialsUpdate, user: dict = Depends(r
                 return {"error": f"You can only connect one {account_type} account. Disconnect the existing one first."}
 
         from brain.utils.crypto import encrypt_password
-        data: dict[str, Any] = {
+        ok = db_save_mt5_credentials({
             "user_id": user_id,
             "login": req.login,
             "password": encrypt_password(req.password),
             "server": req.server,
-        }
-        client.table("mt5_credentials").upsert(data, on_conflict="user_id, login, server").execute()
+        })
+        if not ok:
+            return {"error": "Failed to save credentials"}
         return {"status": "saved"}
     except Exception as e:
         logger.warning("Failed to save MT5 credentials: %s", e)
@@ -201,9 +182,6 @@ async def save_mt5_credentials(req: MT5CredentialsUpdate, user: dict = Depends(r
 @router.put("/mt5/credentials")
 async def update_mt5_credentials(req: MT5CredentialsUpdate, user: dict = Depends(require_auth)) -> dict:
     """Update MT5 server selection and optionally test connection."""
-    client = get_client()
-    if not client:
-        return {"error": "Supabase not configured"}
     user_id = user.get("sub")
     if not user_id:
         return {"error": "not authenticated"}
@@ -211,7 +189,9 @@ async def update_mt5_credentials(req: MT5CredentialsUpdate, user: dict = Depends
     if req.server is not None:
         updates["server"] = req.server
     try:
-        client.table("mt5_credentials").update(updates).eq("user_id", user_id).execute()
+        if updates:
+            if not db_update_mt5_credentials(user_id, updates):
+                return {"error": "Failed to update credentials"}
         return {"status": "updated"}
     except Exception as e:
         logger.warning("Failed to update MT5 credentials: %s", e)
@@ -221,14 +201,11 @@ async def update_mt5_credentials(req: MT5CredentialsUpdate, user: dict = Depends
 @router.delete("/mt5/credentials/{login}/{server}")
 async def delete_mt5_credentials(login: str, server: str, user: dict = Depends(require_auth)) -> dict:
     """Delete a saved MT5 credential by login and server."""
-    client = get_client()
-    if not client:
-        return {"error": "Supabase not configured"}
     user_id = user.get("sub")
     if not user_id:
         return {"error": "not authenticated"}
     try:
-        client.table("mt5_credentials").delete().eq("user_id", user_id).eq("login", login).eq("server", server).execute()
+        db_delete_mt5_credentials(user_id, login, server)
         return {"status": "deleted"}
     except Exception as e:
         logger.warning("Failed to delete MT5 credentials: %s", e)

@@ -23,9 +23,9 @@
 - **8-Sector Pipeline** - Multi-factor market evaluation for high-conviction signals
 - **AI Copilot** - Natural language chat with your trading bot
 - **Auto Trading** - MT5 integration with configurable risk and drawdown protection
-- **Multi-User** - JWT auth + PostgreSQL. Each user sees only their trades.
+- **Multi-User** - Self-hosted JWT auth + PostgreSQL. Each user sees only their trades.
 - **Risk Guardrails** - Max drawdown, cooldowns, spread checks
-- **Responsive Web App** - Mobile-first dashboard
+- **Responsive Web App** - Mobile-first dashboard (separate repo: `VYLUXTECH/futures-frontend`)
 
 ---
 
@@ -35,11 +35,13 @@ Open PowerShell as Administrator:
 
 ```powershell
 Set-ExecutionPolicy RemoteSigned -Scope Process -Force
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/VYLUXTECH/FUTURES/main/scripts/fresh-setup.ps1" -OutFile "$env:TEMP\go.ps1"
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/VYLUXTECH/THE-DISCIPLE/main/scripts/fresh-setup.ps1" -OutFile "$env:TEMP\go.ps1"
 & "$env:TEMP\go.ps1"
 ```
 
-It will ask for your PostgreSQL credentials. Everything else is auto-generated.
+It will ask for your PostgreSQL connection string (`SUPABASE_DB_URI`). Everything else is auto-generated.
+
+> No Supabase service — the backend talks to PostgreSQL directly via psycopg2.
 
 ---
 
@@ -48,8 +50,6 @@ It will ask for your PostgreSQL credentials. Everything else is auto-generated.
 | Variable | Purpose |
 |----------|---------|
 | `SUPABASE_DB_URI` | PostgreSQL connection string |
-| `SUPABASE_URL` | Supabase project URL (data operations) |
-| `SUPABASE_KEY` | Service role key |
 | `JWT_SECRET` | Self-hosted JWT auth secret |
 | `ENCRYPTION_KEY` | Fernet key for MT5 password encryption |
 | `AI_BASE_URL` | Gemini AI endpoint |

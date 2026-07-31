@@ -110,7 +110,7 @@ async def bot_status(user: dict = Depends(require_auth)) -> BotStatusResponse:
 
     if not acct:
         try:
-            from brain.db.supabase import get_state
+            from brain.db.postgres_ops import get_state
             saved = get_state(f"balance:{user_id}")
             if saved:
                 balance = saved.get("balance", 0.0)
@@ -134,7 +134,7 @@ async def bot_status(user: dict = Depends(require_auth)) -> BotStatusResponse:
             from brain.config.settings import SUPABASE_DB_URI
             uri = SUPABASE_DB_URI or os.getenv("SUPABASE_DB_URI")
             if uri:
-                from brain.db.supabase import _get_conn
+                from brain.db.postgres_ops import _get_conn
                 conn = _get_conn(uri)
                 with conn, conn.cursor() as cur:
                     cur.execute(
@@ -180,7 +180,7 @@ async def dashboard(user: dict = Depends(require_auth)) -> dict:
 
     if not acct:
         try:
-            from brain.db.supabase import get_state
+            from brain.db.postgres_ops import get_state
             saved = get_state(f"balance:{user_id}")
             if saved:
                 balance = saved.get("balance", 0.0)
@@ -320,7 +320,7 @@ async def mt5_connect(req: MT5ConnectRequest, user: dict = Depends(require_auth)
     server_to_use = req.server
     if not password_to_use and uri:
         try:
-            from brain.db.supabase import _get_conn
+            from brain.db.postgres_ops import _get_conn
             from utils.crypto import decrypt_password
             conn = _get_conn(uri)
             with conn, conn.cursor() as cur:
@@ -396,7 +396,7 @@ async def mt5_connect(req: MT5ConnectRequest, user: dict = Depends(require_auth)
     # ── Persist connection result back to Supabase (match by login + server) ──
     if uri:
         try:
-            from brain.db.supabase import _get_conn
+            from brain.db.postgres_ops import _get_conn
             conn = _get_conn(uri)
             with conn, conn.cursor() as cur:
                 cur.execute("""
@@ -430,7 +430,7 @@ async def mt5_connect(req: MT5ConnectRequest, user: dict = Depends(require_auth)
         bal = result["account"]["balance"]
         eq = result["account"]["equity"]
         _bot_state[f"acct:{user_id}"] = {"balance": bal, "equity": eq}
-        from brain.db.supabase import set_state
+        from brain.db.postgres_ops import set_state
         set_state(f"balance:{user_id}", {"balance": bal, "equity": eq})
 
     logger.info(
@@ -482,7 +482,7 @@ async def list_mt5_accounts(user: dict = Depends(require_auth)) -> dict:
         return {"accounts": []}
 
     try:
-        from brain.db.supabase import _get_conn
+        from brain.db.postgres_ops import _get_conn
         conn = _get_conn(uri)
         with conn, conn.cursor() as cur:
             cur.execute(
@@ -526,7 +526,7 @@ async def switch_mt5_account(req: SwitchAccountRequest, user: dict = Depends(req
         return {"status": "error", "detail": "Database not configured"}
 
     try:
-        from brain.db.supabase import _get_conn
+        from brain.db.postgres_ops import _get_conn
         conn = _get_conn(uri)
         with conn, conn.cursor() as cur:
             cur.execute(
@@ -593,7 +593,7 @@ async def create_support_ticket(req: SupportTicketRequest, request: Request, use
     ticket_id = None
     display_name = f"User: {email}"
     try:
-        from brain.db.supabase import _get_conn
+        from brain.db.postgres_ops import _get_conn
         conn = _get_conn(uri)
         with conn, conn.cursor() as cur:
             cur.execute(

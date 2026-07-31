@@ -76,18 +76,83 @@ def init_db(uri: str | None = None) -> None:
                     created_at    TIMESTAMPTZ DEFAULT NOW()
                 )
             """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS profiles (
+                    id               UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                    risk_percent     NUMERIC(4,1) DEFAULT 5.0,
+                    be_policy        TEXT DEFAULT 'auto',
+                    dry_run          BOOLEAN DEFAULT FALSE,
+                    auto_compounding BOOLEAN DEFAULT FALSE,
+                    display_name     VARCHAR(100) DEFAULT 'Trader',
+                    notifications    JSONB DEFAULT '{}'::jsonb,
+                    bot_active       BOOLEAN DEFAULT FALSE,
+                    expo_push_token  TEXT,
+                    broker_verified  BOOLEAN DEFAULT FALSE,
+                    broker_name      TEXT,
+                    created_at       TIMESTAMPTZ DEFAULT NOW(),
+                    updated_at       TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS user_settings (
+                    user_id          UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                    max_daily_trades INTEGER DEFAULT 5,
+                    risk_percent     REAL DEFAULT 5.0,
+                    trading_mode     TEXT DEFAULT 'short',
+                    trade_count      INTEGER DEFAULT 1,
+                    updated_at       TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS mt5_credentials (
+                    user_id                   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    login                     VARCHAR(50) NOT NULL,
+                    password                  VARCHAR(500) NOT NULL,
+                    server                    VARCHAR(100) NOT NULL,
+                    account_name              VARCHAR(100),
+                    connected                 BOOLEAN DEFAULT FALSE,
+                    automated_trading_enabled BOOLEAN DEFAULT FALSE,
+                    last_error                TEXT,
+                    last_connected_at         TIMESTAMPTZ,
+                    updated_at                TIMESTAMPTZ DEFAULT NOW(),
+                    UNIQUE (user_id, login, server)
+                )
+            """)
+            cur.execute("""
+                DO $$
+                BEGIN
+                    IF to_regclass('auth.users') IS NOT NULL THEN
+                        EXECUTE (
+                            SELECT string_agg(
+                                format('ALTER TABLE %s DROP CONSTRAINT %I',
+                                       conrelid::regclass, conname),
+                                '; ')
+                            FROM pg_constraint
+                            WHERE contype = 'f' AND confrelid = 'auth.users'::regclass
+                        );
+                    END IF;
+                END $$;
+            """)
+            cur.execute("ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS risk_percent REAL DEFAULT 5.0")
+            cur.execute("ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS trade_count INTEGER DEFAULT 1")
+            cur.execute("ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS trading_mode TEXT DEFAULT 'short'")
+            cur.execute("ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS max_daily_trades INTEGER DEFAULT 5")
             conn.commit()
-        logger.info("Database tables initialised")
+            logger.info("Database tables initialised")
     except Exception as exc:
         logger.warning("init_db error: %s", exc)
 
 
-from .supabase import (
+from .postgres_ops import (
     sync_trade, test_connection,
     get_recent_trades, get_open_trades,
     count_trades_today, count_losses_last_24h, get_todays_pnl,
     get_state, set_state, log_signal,
     get_all_mt5_credentials,
+    get_profile, update_profile,
+    get_user_settings, upsert_user_settings_dict,
+    get_mt5_accounts, get_mt5_credentials, get_mt5_connected,
+    save_mt5_credentials, update_mt5_credentials, delete_mt5_credentials,
 )
 
 __all__ = [
@@ -96,4 +161,8 @@ __all__ = [
     "count_trades_today", "count_losses_last_24h", "get_todays_pnl",
     "get_state", "set_state", "log_signal",
     "get_all_mt5_credentials",
+    "get_profile", "update_profile",
+    "get_user_settings", "upsert_user_settings_dict",
+    "get_mt5_accounts", "get_mt5_credentials", "get_mt5_connected",
+    "save_mt5_credentials", "update_mt5_credentials", "delete_mt5_credentials",
 ]

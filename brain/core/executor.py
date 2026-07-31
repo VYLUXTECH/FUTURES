@@ -56,7 +56,7 @@ def place_order(
     tp_price: float,
     confidence: int,
     sectors: dict,
-    supabase_uri: str | None = None,
+    db_uri: str | None = None,
     max_retries: int = 3,
     slippage_pips: float | None = None,
     user_id: str | None = None,
@@ -77,7 +77,7 @@ def place_order(
             opened_at=datetime.now(timezone.utc).isoformat(),
             closed_at=None, confidence=confidence,
             sectors_json=json.dumps(sectors) if sectors else None,
-            uri=supabase_uri, user_id=user_id,
+            uri=db_uri, user_id=user_id,
         )
         return {"ticket": 0, "entry": entry_price, "retcode": 0, "dry_run": True}
 
@@ -154,7 +154,7 @@ def place_order(
                 opened_at=datetime.now(timezone.utc).isoformat(),
                 closed_at=None, confidence=confidence,
                 sectors_json=json.dumps(sectors) if sectors else None,
-                uri=supabase_uri, user_id=user_id,
+                uri=db_uri, user_id=user_id,
             )
             return {"ticket": result.order, "entry": exec_price, "retcode": result.retcode}
 
@@ -188,7 +188,7 @@ def close_position(
     pair: str,
     direction: Direction,
     lots: float,
-    supabase_uri: str | None = None,
+    db_uri: str | None = None,
     user_id: str | None = None,
 ) -> bool:
     tick = mt5.symbol_info_tick(pair)
@@ -223,7 +223,7 @@ def close_position(
             ticket=ticket, pair=pair, direction=direction, lots=lots,
             entry_price=None, sl_price=0, tp_price=0, pnl=pnl,
             status="CLOSED", opened_at="", closed_at=datetime.now(timezone.utc).isoformat(),
-            confidence=0, uri=supabase_uri, user_id=user_id,
+            confidence=0, uri=db_uri, user_id=user_id,
         )
         logger.info("Position closed | ticket=%d | pnl=%.2f", ticket, pnl)
         return True

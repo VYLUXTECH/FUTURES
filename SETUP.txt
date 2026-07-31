@@ -9,8 +9,6 @@ Invoke-WebRequest -Uri "https://raw.githubusercontent.com/VYLUXTECH/THE-DISCIPLE
 
 It will ask for:
 1. SUPABASE_DB_URI (PostgreSQL connection string)
-2. SUPABASE_URL (e.g. https://uelvridbdykdfqqoihcc.supabase.co)
-3. SUPABASE_KEY (service role key)
 
 After setup:
   URL:      https://bot.futuretraders.net

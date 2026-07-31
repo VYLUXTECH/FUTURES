@@ -17,7 +17,7 @@ from brain.core.risk import RiskEngine
 from brain.data.feed import get_candles
 from brain.db import get_all_mt5_credentials, get_open_trades, get_user_max_daily_trades
 from brain.api.routes import set_bot_state_ref
-from brain.db.supabase import set_state
+from brain.db.postgres_ops import set_state
 from brain.utils.mt5_helper import reconnect_mt5, is_connected
 from brain.utils.logger import setup_logging
 
@@ -172,7 +172,7 @@ def _run_user_cycle(user: dict) -> None:
     trading_mode = "short"
     auto_compound = False
     try:
-        from brain.db.supabase import _get_conn
+        from brain.db.postgres_ops import _get_conn
         conn = _get_conn(SUPABASE_DB_URI)
         with conn, conn.cursor() as cur:
             cur.execute("SELECT risk_percent, trading_mode, auto_compounding FROM profiles WHERE id = %s", (user_id,))
@@ -245,7 +245,7 @@ def _run_user_cycle(user: dict) -> None:
                 tp_price=signal["take_profit"],
                 confidence=signal["confidence"],
                 sectors=signal["sectors"],
-                supabase_uri=SUPABASE_DB_URI,
+                db_uri=SUPABASE_DB_URI,
                 user_id=user_id,
             )
             if result:

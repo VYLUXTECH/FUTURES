@@ -1,6 +1,6 @@
 # ============================================================
-# TheDisciple v2.0 – Supabase Trade & State Persistence
-# Uses Transaction Pooler (port 6543, IPv4-compatible).
+# TheDisciple v2.0 – PostgreSQL Trade & State Persistence
+# Direct psycopg2 access via SUPABASE_DB_URI (plain Postgres host).
 # All operations are fire-and-forget from background threads.
 # ============================================================
 from __future__ import annotations
@@ -19,9 +19,10 @@ try:
     import psycopg2
     import psycopg2.extras
     _PSYCOPG2_AVAILABLE = True
+    psycopg2.extras.register_default_jsonb(loads=json.loads)
 except ImportError:
     _PSYCOPG2_AVAILABLE = False
-    logger.warning("psycopg2 not installed — Supabase disabled")
+    logger.warning("psycopg2 not installed — PostgreSQL persistence disabled")
 
 
 def _get_conn(uri: str):
@@ -52,7 +53,7 @@ def _exec_query(sql: str, params: tuple = (), uri: str | None = None, fetch: boo
             conn.commit()
             return None
     except Exception as exc:
-        logger.warning("Supabase query error: %s", exc)
+        logger.warning("PostgreSQL query error: %s", exc)
         return [] if fetch else None
 
 
@@ -76,7 +77,7 @@ def sync_trade(
     uri: str | None = None,
 ) -> None:
     """
-    Upsert a single trade to Supabase. Runs in a background thread.
+    Upsert a single trade to PostgreSQL. Runs in a background thread.
     Silently swallows errors so trading loop is never blocked.
     """
     uri = _resolve_uri(uri)
@@ -108,9 +109,9 @@ def sync_trade(
                 )
             conn.close()
         except Exception as exc:
-            logger.warning("Supabase sync error for ticket %s: %s", ticket, exc)
+            logger.warning("PostgreSQL sync error for ticket %s: %s", ticket, exc)
 
-    threading.Thread(target=_task, daemon=True, name="supabase_sync").start()
+    threading.Thread(target=_task, daemon=True, name="pg_sync").start()
 
 
 # ── Trade Reads ─────────────────────────────────────────────
@@ -224,9 +225,9 @@ def set_state(key: str, value: Any, uri: str | None = None) -> None:
                 )
             conn.close()
         except Exception as exc:
-            logger.warning("Supabase state sync error: %s", exc)
+            logger.warning("PostgreSQL state sync error: %s", exc)
 
-    threading.Thread(target=_task, daemon=True, name="supabase_state").start()
+    threading.Thread(target=_task, daemon=True, name="pg_state").start()
 
 
 # ── Signal Logging ──────────────────────────────────────────
@@ -256,15 +257,15 @@ def log_signal(
             conn.commit()
             conn.close()
         except Exception as exc:
-            logger.warning("Supabase signal log error: %s", exc)
+            logger.warning("PostgreSQL signal log error: %s", exc)
 
-    threading.Thread(target=_task, daemon=True, name="supabase_signal").start()
+    threading.Thread(target=_task, daemon=True, name="pg_signal").start()
 
 
 # ── User Settings (per-user config) ────────────────────────
 
 def get_user_max_daily_trades(user_id: str | None = None, uri: str | None = None) -> int:
-    """Fetch max_daily_trades for a user from Supabase. Falls back to default."""
+    """Fetch max_daily_trades for a user from PostgreSQL. Falls back to default."""
     from brain.config.constants import MAX_DAILY_TRADES
     if not user_id:
         return MAX_DAILY_TRADES
@@ -307,9 +308,9 @@ def upsert_user_setting(
                 )
             conn.close()
         except Exception as exc:
-            logger.warning("Supabase user_settings upsert error: %s", exc)
+            logger.warning("PostgreSQL user_settings upsert error: %s", exc)
 
-    threading.Thread(target=_task, daemon=True, name="supabase_user_settings").start()
+    threading.Thread(target=_task, daemon=True, name="pg_user_settings").start()
 
 
 # ── Multi-User: Fetch all MT5 credentials ───────────────────
@@ -331,6 +332,211 @@ def get_all_mt5_credentials(uri: str | None = None) -> list[dict]:
             pass
         row["login"] = int(row["login"])
     return rows
+
+
+# ── Profiles (per-user settings) ───────────────────────────
+
+def _ensure_profile(user_id: str, uri: str) -> None:
+    """Ensure a profile row exists so child FKs can reference it."""
+    try:
+        conn = _get_conn(uri)
+        with conn, conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO profiles (id) VALUES (%s) ON CONFLICT (id) DO NOTHING",
+                (user_id,),
+            )
+        conn.close()
+    except Exception as exc:
+        logger.warning("ensure_profile error: %s", exc)
+
+
+def get_profile(user_id: str, uri: str | None = None) -> dict | None:
+    """Fetch a user's profile row from PostgreSQL."""
+    rows = _exec_query(
+        "SELECT * FROM profiles WHERE id = %s",
+        (user_id,), uri=uri, fetch=True,
+    )
+    return rows[0] if rows else None
+
+
+def update_profile(user_id: str, updates: dict, uri: str | None = None) -> bool:
+    """Upsert a user's profile row (only allowlisted columns)."""
+    uri = _resolve_uri(uri)
+    if not uri:
+        return False
+    ALLOWED = {
+        "risk_percent", "be_policy", "dry_run", "auto_compounding",
+        "display_name", "notifications", "broker_verified",
+    }
+    fields = {k: v for k, v in updates.items() if k in ALLOWED}
+    if not fields:
+        return False
+    _ensure_profile(user_id, uri)
+    sets = ", ".join(f"{col} = %s" for col in fields)
+    cols = ", ".join(fields)
+    placeholders = ", ".join(["%s"] * len(fields))
+    params = []
+    for col, val in fields.items():
+        params.append(json.dumps(val) if col == "notifications" and val is not None else val)
+    sql = f"""
+        INSERT INTO profiles (id, {cols}, updated_at)
+        VALUES (%s, {placeholders}, NOW())
+        ON CONFLICT (id) DO UPDATE SET
+            {sets},
+            updated_at = NOW()
+    """
+    try:
+        conn = _get_conn(uri)
+        with conn, conn.cursor() as cur:
+            cur.execute(sql, [user_id, *params])
+        conn.close()
+        return True
+    except Exception as exc:
+        logger.warning("update_profile error: %s", exc)
+        return False
+
+
+# ── User Settings ──────────────────────────────────────────
+
+def get_user_settings(user_id: str, uri: str | None = None) -> dict | None:
+    """Fetch a user's settings row from PostgreSQL."""
+    rows = _exec_query(
+        "SELECT * FROM user_settings WHERE user_id = %s",
+        (user_id,), uri=uri, fetch=True,
+    )
+    return rows[0] if rows else None
+
+
+def upsert_user_settings_dict(user_id: str, updates: dict, uri: str | None = None) -> bool:
+    """Upsert multiple user_settings columns (only allowlisted columns)."""
+    uri = _resolve_uri(uri)
+    if not uri:
+        return False
+    ALLOWED = {"max_daily_trades", "risk_percent", "trading_mode", "trade_count"}
+    fields = {k: v for k, v in updates.items() if k in ALLOWED}
+    if not fields:
+        return False
+    _ensure_profile(user_id, uri)
+    sets = ", ".join(f"{col} = EXCLUDED.{col}" for col in fields)
+    cols = ", ".join(fields)
+    placeholders = ", ".join(["%s"] * len(fields))
+    sql = f"""
+        INSERT INTO user_settings (user_id, {cols}, updated_at)
+        VALUES (%s, {placeholders}, NOW())
+        ON CONFLICT (user_id) DO UPDATE SET
+            {sets},
+            updated_at = NOW()
+    """
+    try:
+        conn = _get_conn(uri)
+        with conn, conn.cursor() as cur:
+            cur.execute(sql, [user_id, *fields.values()])
+        conn.close()
+        return True
+    except Exception as exc:
+        logger.warning("upsert_user_settings_dict error: %s", exc)
+        return False
+
+
+# ── MT5 Credentials ────────────────────────────────────────
+
+def get_mt5_accounts(user_id: str, uri: str | None = None) -> list[dict]:
+    """Fetch a user's MT5 accounts (login + server only)."""
+    rows = _exec_query(
+        "SELECT login, server FROM mt5_credentials WHERE user_id = %s",
+        (user_id,), uri=uri, fetch=True,
+    )
+    return rows or []
+
+
+def get_mt5_credentials(user_id: str, uri: str | None = None) -> list[dict]:
+    """Fetch a user's MT5 account details (no password)."""
+    rows = _exec_query(
+        """SELECT login, server, connected, automated_trading_enabled,
+                  last_error, last_connected_at
+           FROM mt5_credentials WHERE user_id = %s ORDER BY updated_at DESC""",
+        (user_id,), uri=uri, fetch=True,
+    )
+    return rows or []
+
+
+def get_mt5_connected(user_id: str, uri: str | None = None) -> bool:
+    """True if any of the user's MT5 accounts is connected."""
+    rows = _exec_query(
+        "SELECT connected FROM mt5_credentials WHERE user_id = %s",
+        (user_id,), uri=uri, fetch=True,
+    )
+    return bool(rows) and any(bool(r.get("connected")) for r in rows)
+
+
+def save_mt5_credentials(data: dict, uri: str | None = None) -> bool:
+    """Upsert MT5 credentials keyed by (user_id, login, server)."""
+    uri = _resolve_uri(uri)
+    if not uri:
+        return False
+    _ensure_profile(data.get("user_id", ""), uri)
+    try:
+        conn = _get_conn(uri)
+        with conn, conn.cursor() as cur:
+            cur.execute(
+                """INSERT INTO mt5_credentials (user_id, login, password, server, updated_at)
+                   VALUES (%s, %s, %s, %s, NOW())
+                   ON CONFLICT (user_id, login, server) DO UPDATE SET
+                       password  = EXCLUDED.password,
+                       updated_at = NOW()""",
+                (data.get("user_id"), data.get("login"),
+                 data.get("password"), data.get("server")),
+            )
+        conn.close()
+        return True
+    except Exception as exc:
+        logger.warning("save_mt5_credentials error: %s", exc)
+        return False
+
+
+def update_mt5_credentials(user_id: str, updates: dict, uri: str | None = None) -> bool:
+    """Update MT5 credential columns for a user (only allowlisted columns)."""
+    uri = _resolve_uri(uri)
+    if not uri:
+        return False
+    ALLOWED = {"server", "connected", "automated_trading_enabled",
+               "last_error", "last_connected_at"}
+    fields = {k: v for k, v in updates.items() if k in ALLOWED}
+    if not fields:
+        return False
+    sets = ", ".join(f"{col} = %s" for col in fields)
+    try:
+        conn = _get_conn(uri)
+        with conn, conn.cursor() as cur:
+            cur.execute(
+                f"""UPDATE mt5_credentials SET {sets}, updated_at = NOW()
+                    WHERE user_id = %s""",
+                [*fields.values(), user_id],
+            )
+        conn.close()
+        return True
+    except Exception as exc:
+        logger.warning("update_mt5_credentials error: %s", exc)
+        return False
+
+
+def delete_mt5_credentials(user_id: str, login: str, server: str, uri: str | None = None) -> bool:
+    """Delete an MT5 credential by login and server."""
+    uri = _resolve_uri(uri)
+    if not uri:
+        return False
+    try:
+        conn = _get_conn(uri)
+        with conn, conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM mt5_credentials WHERE user_id = %s AND login = %s AND server = %s",
+                (user_id, login, server),
+            )
+        conn.close()
+        return True
+    except Exception as exc:
+        logger.warning("delete_mt5_credentials error: %s", exc)
+        return False
 
 
 # ── Connection Test ─────────────────────────────────────────

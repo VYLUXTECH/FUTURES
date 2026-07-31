@@ -109,11 +109,7 @@ Write-Host "[5/8] Creating .env file..." -ForegroundColor Yellow
 
 Write-Host "  Enter your credentials (press Enter to skip optional fields):" -ForegroundColor White
 
-$supabaseUrl = Read-Host "  SUPABASE_URL"
-$supabaseKey = Read-Host "  SUPABASE_KEY (anon)"
 $supabaseDbUri = Read-Host "  SUPABASE_DB_URI"
-$supabaseServiceRole = Read-Host "  SUPABASE_SERVICE_ROLE_KEY"
-$supabaseJwt = Read-Host "  SUPABASE_JWT_SECRET"
 
 
 $lines = @(
@@ -128,12 +124,8 @@ $lines = @(
     "# --- Allowed Origins ---"
     "ALLOWED_ORIGINS=https://bot.futuretraders.net"
     ""
-    "# --- Supabase ---"
-    "SUPABASE_URL=$supabaseUrl"
-    "SUPABASE_KEY=$supabaseKey"
+    "# --- Database ---"
     "SUPABASE_DB_URI=$supabaseDbUri"
-    "SUPABASE_SERVICE_ROLE_KEY=$supabaseServiceRole"
-    "SUPABASE_JWT_SECRET=$supabaseJwt"
     ""
     "# --- Encryption ---"
     "ENCRYPTION_KEY=$encKey"

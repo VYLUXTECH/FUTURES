@@ -19,7 +19,7 @@ except ImportError:
 
 from brain.config.constants import SUPPORTED_PAIRS, MIN_RISK_PERCENT, MAX_RISK_PERCENT
 from brain.config.settings import AI_BASE_URL, AI_MODEL
-from brain.db.supabase import (
+from brain.db.postgres_ops import (
     get_state,
     set_state,
     get_all_mt5_credentials,
@@ -27,6 +27,11 @@ from brain.db.supabase import (
     get_recent_trades,
     get_todays_pnl,
     count_trades_today,
+    get_profile,
+    get_user_settings,
+    get_mt5_connected,
+    update_profile,
+    upsert_user_settings_dict,
 )
 
 from backend.ai.market_summary import MarketSummaryEngine
@@ -37,15 +42,6 @@ logger = logging.getLogger(__name__)
 
 RATE_LIMIT_PER_MIN = 30
 CONFIRMATION_TIMEOUT = 120
-
-_SUPABASE_CLIENT: Any = None
-
-def _get_supabase():
-    global _SUPABASE_CLIENT
-    if _SUPABASE_CLIENT is None:
-        from backend.db.supabase import get_client
-        _SUPABASE_CLIENT = get_client()
-    return _SUPABASE_CLIENT
 
 
 class CopilotEngine:
@@ -140,22 +136,18 @@ RESPOND naturally and conversationally. Do NOT output JSON or code unless callin
 
     def _get_user_info(self, user_id: str) -> dict | None:
         try:
-            sb = _get_supabase()
-            if not sb:
-                return None
-            profile = sb.table("profiles").select("*").eq("id", user_id).maybe_single().execute()
-            settings = sb.table("user_settings").select("*").eq("user_id", user_id).maybe_single().execute()
-            creds = sb.table("mt5_credentials").select("connected").eq("user_id", user_id).maybe_single().execute()
+            profile = get_profile(user_id)
+            settings = get_user_settings(user_id)
             info = {}
-            if profile.data:
-                info["risk_percent"] = profile.data.get("risk_percent", 5)
-                info["auto_compounding"] = profile.data.get("auto_compounding", False)
-                info["broker_verified"] = profile.data.get("broker_verified", False)
-            if settings.data:
-                info["trading_mode"] = settings.data.get("trading_mode", "short")
-                info["max_daily_trades"] = settings.data.get("max_daily_trades", 5)
-                info["trade_count"] = settings.data.get("trade_count", 1)
-            info["mt5_connected"] = bool(creds.data.get("connected")) if creds.data else False
+            if profile:
+                info["risk_percent"] = profile.get("risk_percent", 5)
+                info["auto_compounding"] = profile.get("auto_compounding", False)
+                info["broker_verified"] = profile.get("broker_verified", False)
+            if settings:
+                info["trading_mode"] = settings.get("trading_mode", "short")
+                info["max_daily_trades"] = settings.get("max_daily_trades", 5)
+                info["trade_count"] = settings.get("trade_count", 1)
+            info["mt5_connected"] = get_mt5_connected(user_id)
             acct = self._bot_state.get(f"acct:{user_id}", {})
             if acct:
                 info["balance"] = acct.get("balance", 0)
@@ -494,27 +486,10 @@ RESPOND naturally and conversationally. Do NOT output JSON or code unless callin
         return {"reply": f"Unknown action: {action_type}"}
 
     async def _update_profile(self, user_id: str, updates: dict) -> bool:
-        try:
-            sb = _get_supabase()
-            if not sb:
-                return False
-            sb.table("profiles").update(updates).eq("id", user_id).execute()
-            return True
-        except Exception as exc:
-            logger.warning("Failed to update profile for %s: %s", user_id, exc)
-            return False
+        return update_profile(user_id, updates)
 
     async def _upsert_user_settings(self, user_id: str, updates: dict) -> bool:
-        try:
-            sb = _get_supabase()
-            if not sb:
-                return False
-            data = {"user_id": user_id, **updates}
-            sb.table("user_settings").upsert(data, on_conflict="user_id").execute()
-            return True
-        except Exception as exc:
-            logger.warning("Failed to update user_settings for %s: %s", user_id, exc)
-            return False
+        return upsert_user_settings_dict(user_id, updates)
 
     async def _execute_start_trading(self, args: dict, user_id: str) -> dict:
         trade_count = args.get("trade_count")

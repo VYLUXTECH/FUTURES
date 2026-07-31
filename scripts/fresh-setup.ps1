@@ -75,18 +75,12 @@ $jwtSecret = python -c "import secrets; print(secrets.token_urlsafe(64))"
 Write-Host ""
 Write-Host "Enter your PostgreSQL connection string:" -ForegroundColor White
 $dbUri = Read-Host "SUPABASE_DB_URI"
-Write-Host "Enter Supabase URL (for data):" -ForegroundColor White
-$supUrl = Read-Host "SUPABASE_URL"
-Write-Host "Enter Supabase service role key:" -ForegroundColor White
-$supKey = Read-Host "SUPABASE_KEY"
 
 @"
 API_HOST=127.0.0.1
 API_PORT=8000
 ALLOWED_ORIGINS=https://bot.futuretraders.net
 SUPABASE_DB_URI=$dbUri
-SUPABASE_URL=$supUrl
-SUPABASE_KEY=$supKey
 ENCRYPTION_KEY=$encKey
 JWT_SECRET=$jwtSecret
 AI_BASE_URL=https://api.nexray.eu.cc/ai/gemini

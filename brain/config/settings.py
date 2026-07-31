@@ -31,14 +31,11 @@ HF_VISION_MODEL: str = os.getenv(
     "HF_VISION_MODEL", "Qwen/Qwen2.5-VL-72B-Instruct"
 )
 
-# ── Supabase (Transaction Pooler port 6543, IPv4) ─────────
+# ── Database (PostgreSQL connection string) ───────────────
 SUPABASE_DB_URI: str | None = os.getenv("SUPABASE_DB_URI")
 
 # ── Logging ────────────────────────────────────────────────
 LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO").upper()
-
-# ── Supabase Service Role (admin) ─────────────────────────
-SUPABASE_SERVICE_ROLE_KEY: str | None = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
 
 

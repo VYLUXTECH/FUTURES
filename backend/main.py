@@ -22,7 +22,7 @@ if _PROJECT_ROOT not in sys.path:
 # ── TheDisciple imports ───────────────────────────────
 from brain.utils.logger import setup_logging
 from brain.config.settings import (
-    SUPABASE_DB_URI, validate_required,
+    validate_required,
 )
 from brain.db.postgres import init_db
 
@@ -41,7 +41,6 @@ from backend.api.copilot import router as copilot_router, set_copilot_engine
 from backend.api.settings import router as settings_router, set_bot_state_ref as set_settings_state_ref
 from backend.api.public import router as public_router
 from backend.ai import CopilotEngine, MarketSummaryEngine, ChartGenerator
-from backend.db.supabase import get_client
 
 setup_logging()
 logger = logging.getLogger("thedisciple.app")
