@@ -7,7 +7,12 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Generator
 
-import MetaTrader5 as mt5
+try:
+    import MetaTrader5 as mt5
+    MT5_AVAILABLE = True
+except ImportError:
+    mt5 = None
+    MT5_AVAILABLE = False
 
 from pathlib import Path
 

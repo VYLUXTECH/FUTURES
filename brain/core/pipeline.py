@@ -2,7 +2,12 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-import pandas as pd
+try:
+    import pandas as pd
+    PANDAS_AVAILABLE = True
+except ImportError:
+    pd = None
+    PANDAS_AVAILABLE = False
 
 from brain.config.constants import CONFIDENCE_THRESHOLD, VALID_ALIGNMENTS, PIP_SIZES
 from brain.db import log_signal

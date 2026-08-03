@@ -13,8 +13,19 @@ import logging
 import os
 from pathlib import Path
 
-import MetaTrader5 as mt5
-import pandas as pd
+try:
+    import MetaTrader5 as mt5
+    MT5_AVAILABLE = True
+except ImportError:
+    mt5 = None
+    MT5_AVAILABLE = False
+
+try:
+    import pandas as pd
+    PANDAS_AVAILABLE = True
+except ImportError:
+    pd = None
+    PANDAS_AVAILABLE = False
 
 from brain.config.constants import SUPPORTED_PAIRS
 from brain.utils.mt5_helper import ensure_symbol
@@ -22,18 +33,21 @@ from brain.utils.mt5_helper import ensure_symbol
 logger = logging.getLogger(__name__)
 
 # ── Timeframe string → MT5 constant (resolved at import time) ─
-TF_MAP: dict[str, int] = {
-    "1m":  mt5.TIMEFRAME_M1,
-    "3m":  mt5.TIMEFRAME_M3,
-    "5m":  mt5.TIMEFRAME_M5,
-    "15m": mt5.TIMEFRAME_M15,
-    "30m": mt5.TIMEFRAME_M30,
-    "1H":  mt5.TIMEFRAME_H1,
-    "4H":  mt5.TIMEFRAME_H4,
-    "1D":  mt5.TIMEFRAME_D1,
-    "1W":  mt5.TIMEFRAME_W1,
-    "1M":  mt5.TIMEFRAME_MN1,
-}
+if MT5_AVAILABLE:
+    TF_MAP: dict[str, int] = {
+        "1m":  mt5.TIMEFRAME_M1,
+        "3m":  mt5.TIMEFRAME_M3,
+        "5m":  mt5.TIMEFRAME_M5,
+        "15m": mt5.TIMEFRAME_M15,
+        "30m": mt5.TIMEFRAME_M30,
+        "1H":  mt5.TIMEFRAME_H1,
+        "4H":  mt5.TIMEFRAME_H4,
+        "1D":  mt5.TIMEFRAME_D1,
+        "1W":  mt5.TIMEFRAME_W1,
+        "1M":  mt5.TIMEFRAME_MN1,
+    }
+else:
+    TF_MAP: dict[str, int] = {}
 
 _REQUIRED_COLS = ["open", "high", "low", "close", "tick_volume"]
 

@@ -7,7 +7,12 @@ import logging
 from datetime import datetime, timezone
 
 import os
-import MetaTrader5 as mt5
+try:
+    import MetaTrader5 as mt5
+    MT5_AVAILABLE = True
+except ImportError:
+    mt5 = None
+    MT5_AVAILABLE = False
 
 from brain.config.constants import SUPPORTED_PAIRS, PIP_SIZES, SESSION_START_UTC, SESSION_END_UTC, MAX_DAILY_TRADES
 from brain.config.settings import SUPABASE_DB_URI, validate_required

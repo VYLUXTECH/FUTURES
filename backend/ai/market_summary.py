@@ -12,7 +12,12 @@ try:
 except ImportError:
     mt5 = None
     MT5_AVAILABLE = False
-import pandas as pd
+try:
+    import pandas as pd
+    PANDAS_AVAILABLE = True
+except ImportError:
+    pd = None
+    PANDAS_AVAILABLE = False
 
 from brain.config.constants import SUPPORTED_PAIRS, PIP_SIZES
 from brain.data.feed import get_candles
@@ -36,6 +41,9 @@ class MarketSummaryEngine:
 
     def start(self) -> None:
         if self._running:
+            return
+        if not PANDAS_AVAILABLE:
+            logger.info("pandas unavailable — market summary engine disabled")
             return
         self._running = True
         self._thread = threading.Thread(target=self._loop, name="market_summary", daemon=True)

@@ -7,7 +7,12 @@ import tempfile
 from datetime import datetime
 from typing import Any
 
-import pandas as pd
+try:
+    import pandas as pd
+    PANDAS_AVAILABLE = True
+except ImportError:
+    pd = None
+    PANDAS_AVAILABLE = False
 
 from brain.config.constants import SUPPORTED_PAIRS
 from brain.data.feed import get_candles

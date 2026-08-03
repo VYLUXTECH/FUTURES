@@ -6,7 +6,12 @@ import time
 from datetime import datetime, timezone
 from typing import Literal
 
-import MetaTrader5 as mt5
+try:
+    import MetaTrader5 as mt5
+    MT5_AVAILABLE = True
+except ImportError:
+    mt5 = None
+    MT5_AVAILABLE = False
 
 from brain.config.constants import (
     MAGIC_NUMBER,
@@ -22,14 +27,17 @@ logger = logging.getLogger(__name__)
 
 DRY_RUN_KEY = "dry_run"
 
-_RETRYABLE_RETCODES: frozenset[int] = frozenset({
-    mt5.TRADE_RETCODE_REQUOTE,
-    mt5.TRADE_RETCODE_PRICE_CHANGED,
-    mt5.TRADE_RETCODE_PRICE_OFF,
-    mt5.TRADE_RETCODE_CONNECTION,
-    mt5.TRADE_RETCODE_TIMEOUT,
-    getattr(mt5, "TRADE_RETCODE_OFF_QUOTES", None),
-}) - {None}
+if MT5_AVAILABLE:
+    _RETRYABLE_RETCODES: frozenset[int] = frozenset({
+        mt5.TRADE_RETCODE_REQUOTE,
+        mt5.TRADE_RETCODE_PRICE_CHANGED,
+        mt5.TRADE_RETCODE_PRICE_OFF,
+        mt5.TRADE_RETCODE_CONNECTION,
+        mt5.TRADE_RETCODE_TIMEOUT,
+        getattr(mt5, "TRADE_RETCODE_OFF_QUOTES", None),
+    }) - {None}
+else:
+    _RETRYABLE_RETCODES: frozenset[int] = frozenset()
 
 Direction = Literal["BUY", "SELL"]
 

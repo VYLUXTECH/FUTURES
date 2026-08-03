@@ -1,6 +1,11 @@
 from __future__ import annotations
 import logging
-import pandas as pd
+try:
+    import pandas as pd
+    PANDAS_AVAILABLE = True
+except ImportError:
+    pd = None
+    PANDAS_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 

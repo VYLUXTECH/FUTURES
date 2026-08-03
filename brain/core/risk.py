@@ -4,7 +4,12 @@ import logging
 from datetime import datetime, timezone, timedelta
 from typing import NamedTuple
 
-import MetaTrader5 as mt5
+try:
+    import MetaTrader5 as mt5
+    MT5_AVAILABLE = True
+except ImportError:
+    mt5 = None
+    MT5_AVAILABLE = False
 
 from brain.config.constants import (
     COOLDOWN_HOURS,

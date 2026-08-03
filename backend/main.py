@@ -19,6 +19,9 @@ load_dotenv()
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
+import importlib.util as _ilu
+_MT5_OK = _ilu.find_spec("MetaTrader5") is not None
+
 # ── Ensure brain/ flat imports resolve ──────────────────
 _PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
 if _PROJECT_ROOT not in sys.path:
@@ -87,14 +90,17 @@ async def lifespan(app: FastAPI):
         if admin_pw:
             seed_admin(hash_password(admin_pw))
         global _trading_thread
-        _trading_thread = threading.Thread(
-            target=trading_loop,
-            name="trading_loop",
-            daemon=False,
-        )
-        _trading_thread.start()
-        _bot_state["trading_thread"] = _trading_thread
-        logger.info("THE DISCIPLE trading engine started")
+        if _MT5_OK:
+            _trading_thread = threading.Thread(
+                target=trading_loop,
+                name="trading_loop",
+                daemon=False,
+            )
+            _trading_thread.start()
+            _bot_state["trading_thread"] = _trading_thread
+            logger.info("THE DISCIPLE trading engine started")
+        else:
+            logger.info("MetaTrader5 unavailable — running API-only mode (trading disabled)")
 
     yield
 
