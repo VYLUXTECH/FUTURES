@@ -1,122 +1,112 @@
 from __future__ import annotations
 
+import json
 import logging
+import os
+import threading
 import uuid
-
-from brain.config.settings import SUPABASE_DB_URI
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-try:
-    import psycopg2
-    _PSYCOPG2_AVAILABLE = True
-except ImportError:
-    _PSYCOPG2_AVAILABLE = False
+_DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+_USERS_FILE = _DATA_DIR / "users.json"
+_lock = threading.Lock()
 
 
-def _get_conn(uri: str | None = None):
-    if not _PSYCOPG2_AVAILABLE:
-        raise RuntimeError("psycopg2 not available")
-    uri = uri or SUPABASE_DB_URI
-    if not uri:
-        raise RuntimeError("SUPABASE_DB_URI not configured")
-    return psycopg2.connect(uri, connect_timeout=10, options="-c statement_timeout=8000")
+def _load_users() -> list[dict]:
+    try:
+        if _USERS_FILE.exists():
+            data = json.loads(_USERS_FILE.read_text(encoding="utf-8"))
+            return data if isinstance(data, list) else []
+    except Exception as exc:
+        logger.warning("Failed to load users file: %s", exc)
+    return []
+
+
+def _save_users(users: list[dict]) -> None:
+    try:
+        _DATA_DIR.mkdir(parents=True, exist_ok=True)
+        tmp = _USERS_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(users, indent=2), encoding="utf-8")
+        tmp.replace(_USERS_FILE)
+    except Exception as exc:
+        logger.warning("Failed to save users file: %s", exc)
 
 
 def ensure_users_table(uri: str | None = None) -> None:
-    """Create users table if it doesn't exist."""
-    conn = _get_conn(uri)
-    try:
-        with conn, conn.cursor() as cur:
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS users (
-                    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                    email         VARCHAR(255) UNIQUE NOT NULL,
-                    password_hash VARCHAR(255) NOT NULL,
-                    display_name  VARCHAR(255) DEFAULT '',
-                    created_at    TIMESTAMPTZ DEFAULT NOW()
-                )
-            """)
-            conn.commit()
-        logger.info("users table ready")
-    except Exception as exc:
-        logger.warning("ensure_users_table error: %s", exc)
-    finally:
-        conn.close()
+    """Local store — ensure the users file exists (no-op beyond file creation)."""
+    with _lock:
+        _save_users(_load_users())
+
+
+def seed_admin(password_hash: str | None = None, email: str | None = None) -> None:
+    """Seed a default admin account if one doesn't exist. Requires a password hash."""
+    if not password_hash:
+        return
+    email = (email or os.getenv("ADMIN_EMAIL", "admin@futuretraders.net")).strip().lower()
+    with _lock:
+        users = _load_users()
+        if any(u.get("email") == email for u in users):
+            return
+        users.append({
+            "id": str(uuid.uuid4()),
+            "email": email,
+            "password_hash": password_hash,
+            "display_name": "Admin",
+            "created_at": "",
+        })
+        _save_users(users)
+        logger.info("Seeded local admin account: %s", email)
 
 
 def create_user(email: str, password_hash: str, display_name: str = "") -> dict | None:
     """Create a new user. Returns the user dict or None on error."""
-    user_id = str(uuid.uuid4())
-    conn = _get_conn()
-    try:
-        with conn, conn.cursor() as cur:
-            cur.execute(
-                "INSERT INTO users (id, email, password_hash, display_name) VALUES (%s, %s, %s, %s) RETURNING id, email, display_name, created_at",
-                (user_id, email.lower().strip(), password_hash, display_name),
-            )
-            row = cur.fetchone()
-            conn.commit()
-            if row:
-                # Also create a profiles row so the rest of the app works
-                cur.execute(
-                    "INSERT INTO profiles (id, display_name) VALUES (%s, %s) ON CONFLICT (id) DO NOTHING",
-                    (row[0], display_name or "Trader"),
-                )
-                conn.commit()
-                return {"id": str(row[0]), "email": row[1], "display_name": row[2], "created_at": str(row[3])}
-    except Exception as exc:
-        logger.warning("create_user error: %s", exc)
-        return None
-    finally:
-        conn.close()
+    email = email.lower().strip()
+    with _lock:
+        users = _load_users()
+        if any(u.get("email") == email for u in users):
+            return None
+        user = {
+            "id": str(uuid.uuid4()),
+            "email": email,
+            "password_hash": password_hash,
+            "display_name": display_name or "Trader",
+            "created_at": "",
+        }
+        users.append(user)
+        _save_users(users)
+        return {"id": user["id"], "email": user["email"], "display_name": user["display_name"], "created_at": user["created_at"]}
 
 
 def get_user_by_email(email: str) -> dict | None:
-    conn = _get_conn()
-    try:
-        with conn, conn.cursor() as cur:
-            cur.execute(
-                "SELECT id, email, password_hash, display_name, created_at FROM users WHERE email = %s",
-                (email.lower().strip(),),
-            )
-            row = cur.fetchone()
-            if row:
-                return {"id": str(row[0]), "email": row[1], "password_hash": row[2], "display_name": row[3], "created_at": str(row[4])}
-    except Exception as exc:
-        logger.warning("get_user_by_email error: %s", exc)
-    finally:
-        conn.close()
+    email = email.lower().strip()
+    with _lock:
+        for u in _load_users():
+            if u.get("email") == email:
+                return dict(u)
     return None
 
 
 def get_user_by_id(user_id: str) -> dict | None:
-    conn = _get_conn()
-    try:
-        with conn, conn.cursor() as cur:
-            cur.execute(
-                "SELECT id, email, display_name, created_at FROM users WHERE id = %s",
-                (user_id,),
-            )
-            row = cur.fetchone()
-            if row:
-                return {"id": str(row[0]), "email": row[1], "display_name": row[2], "created_at": str(row[3])}
-    except Exception as exc:
-        logger.warning("get_user_by_id error: %s", exc)
-    finally:
-        conn.close()
+    with _lock:
+        for u in _load_users():
+            if u.get("id") == user_id:
+                return {
+                    "id": u["id"],
+                    "email": u["email"],
+                    "display_name": u.get("display_name", ""),
+                    "created_at": u.get("created_at", ""),
+                }
     return None
 
 
 def update_password(user_id: str, password_hash: str) -> bool:
-    conn = _get_conn()
-    try:
-        with conn, conn.cursor() as cur:
-            cur.execute("UPDATE users SET password_hash = %s WHERE id = %s", (password_hash, user_id))
-            conn.commit()
-            return cur.rowcount > 0
-    except Exception as exc:
-        logger.warning("update_password error: %s", exc)
-        return False
-    finally:
-        conn.close()
+    with _lock:
+        users = _load_users()
+        for u in users:
+            if u.get("id") == user_id:
+                u["password_hash"] = password_hash
+                _save_users(users)
+                return True
+    return False

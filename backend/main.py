@@ -37,6 +37,7 @@ from brain.main import (
 )
 
 from backend.api.auth import router as auth_router
+from backend.auth import hash_password, ensure_users_table, seed_admin
 from backend.api.copilot import router as copilot_router, set_copilot_engine
 from backend.api.settings import router as settings_router, set_bot_state_ref as set_settings_state_ref
 from backend.api.public import router as public_router
@@ -76,6 +77,10 @@ async def lifespan(app: FastAPI):
         logger.error("Missing required env vars: %s", missing)
     else:
         init_db()
+        ensure_users_table()
+        admin_pw = os.getenv("ADMIN_PASSWORD")
+        if admin_pw:
+            seed_admin(hash_password(admin_pw))
         global _trading_thread
         _trading_thread = threading.Thread(
             target=trading_loop,
@@ -83,6 +88,7 @@ async def lifespan(app: FastAPI):
             daemon=False,
         )
         _trading_thread.start()
+        _bot_state["trading_thread"] = _trading_thread
         logger.info("THE DISCIPLE trading engine started")
 
     yield
@@ -105,6 +111,7 @@ async def lifespan(app: FastAPI):
             daemon=False,
         )
         _trading_thread.start()
+        _bot_state["trading_thread"] = _trading_thread
         logger.info("Trading engine restarted")
         return  # keep the bot running; lifespan continues until actual shutdown
 
@@ -152,6 +159,7 @@ def _restart_engine():
     _bot_state["restart_requested"] = False
     _trading_thread = threading.Thread(target=trading_loop, name="trading_loop", daemon=False)
     _trading_thread.start()
+    _bot_state["trading_thread"] = _trading_thread
     logger.info("Trading engine restarted")
 
 

@@ -18,7 +18,7 @@ from brain.data.feed import get_candles
 from brain.db import get_all_mt5_credentials, get_open_trades, get_user_max_daily_trades
 from brain.api.routes import set_bot_state_ref
 from brain.db.postgres_ops import set_state
-from brain.utils.mt5_helper import reconnect_mt5, is_connected
+from brain.utils.mt5_helper import reconnect_mt5, is_connected, _find_mt5_path
 from brain.utils.logger import setup_logging
 
 setup_logging()
@@ -53,6 +53,37 @@ def connect_user_account(login: int, password: str, server: str) -> bool:
         if account and not getattr(account, "trade_allowed", True):
             logger.warning("Automated trading DISABLED for account %s", login)
     return ok
+
+
+def _get_local_user() -> dict | None:
+    """Single-user mode: attach to the MT5 terminal that is already logged in."""
+    mt5.shutdown()
+    mt5_path = _find_mt5_path()
+    init_kwargs = {"path": mt5_path} if mt5_path else {}
+    for attempt in range(1, 4):
+        try:
+            if mt5.initialize(**init_kwargs):
+                acct = mt5.account_info()
+                if acct:
+                    login = int(getattr(acct, "login", 0))
+                    logger.info("Single-user mode | attached terminal login=%s server=%s",
+                                login, getattr(acct, "server", "?"))
+                    return {
+                        "user_id": "local",
+                        "login": login,
+                        "password": "",
+                        "server": getattr(acct, "server", ""),
+                        "local": True,
+                    }
+                logger.warning("Single-user mode | terminal attached but no account logged in")
+            else:
+                err = mt5.last_error()
+                logger.warning("Single-user attach attempt %d/3 failed: %s %s", attempt, err[0], err[1])
+        except Exception as exc:
+            logger.warning("Single-user attach attempt %d raised: %s", attempt, exc)
+        mt5.shutdown()
+        time.sleep(2 * attempt)
+    return None
 
 
 def fetch_multi_tf(pair: str) -> dict:
@@ -144,7 +175,12 @@ def _run_user_cycle(user: dict) -> None:
     password = user["password"]
     server = user["server"]
 
-    if not connect_user_account(login, password, server):
+    if user.get("local"):
+        if not is_connected():
+            logger.warning("MT5 terminal not attached for local user %s", user_id)
+            _bot_state.setdefault(f"acct:{user_id}", {"balance": 0, "equity": 0})
+            return
+    elif not connect_user_account(login, password, server):
         logger.warning("Failed to connect MT5 for user %s", user_id)
         _bot_state.setdefault(f"acct:{user_id}", {"balance": 0, "equity": 0})
         return
@@ -267,7 +303,11 @@ def _refresh_account_info(user: dict) -> None:
     login = user["login"]
     password = user["password"]
     server = user["server"]
-    if connect_user_account(login, password, server):
+    if user.get("local"):
+        connected = is_connected()
+    else:
+        connected = connect_user_account(login, password, server)
+    if connected:
         info = mt5.account_info()
         balance = getattr(info, "balance", 0.0) if info else 0.0
         equity = getattr(info, "equity", 0.0) if info else 0.0
@@ -285,20 +325,27 @@ def _refresh_account_info(user: dict) -> None:
 
 
 def trading_loop() -> None:
-    logger.info("Multi-user trading thread started")
+    logger.info("THE DISCIPLE trading thread started")
     _bot_state["start_time"] = datetime.now(timezone.utc).isoformat()
-    logger.info("Trading loop active | pairs=%s | tf=%s | mode=multi-user", SUPPORTED_PAIRS, CANDLE_TF)
+    logger.info("Trading loop active | pairs=%s | tf=%s", SUPPORTED_PAIRS, CANDLE_TF)
 
     try:
         while not _stop_event.is_set():
-            if not _bot_state.get("running"):
-                _stop_event.wait(timeout=1)
-                continue
-
             users = get_all_mt5_credentials(SUPABASE_DB_URI)
             if not users:
-                logger.debug("No MT5 credentials found — waiting for users to register")
-                _stop_event.wait(timeout=30)
+                local_user = _get_local_user()
+                if local_user:
+                    if not _bot_state.get("running") and not _bot_state.get("auto_started"):
+                        _bot_state["running"] = True
+                        _bot_state["auto_started"] = True
+                        logger.info("Single-user mode: auto-started bot on logged-in MT5 account")
+                    users = [local_user]
+                else:
+                    logger.info("No MT5 credentials and no logged-in terminal — waiting")
+                    _stop_event.wait(timeout=30)
+                    continue
+            elif not _bot_state.get("running"):
+                _stop_event.wait(timeout=1)
                 continue
 
             utc_now = datetime.now(timezone.utc)

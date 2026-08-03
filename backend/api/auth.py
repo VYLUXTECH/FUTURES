@@ -117,6 +117,11 @@ async def verify_otp(req: VerifyOtpRequest) -> dict:
     # For now, accept any non-empty token for development.
     if not req.token:
         raise HTTPException(status_code=400, detail="Invalid token")
+    if req.type == "recovery" and req.email:
+        user = get_user_by_email(req.email)
+        if user:
+            token = create_access_token(user["id"], user["email"])
+            return {"status": "verified", "detail": "Token accepted", "access_token": token}
     return {"status": "verified", "detail": "Token accepted"}
 
 

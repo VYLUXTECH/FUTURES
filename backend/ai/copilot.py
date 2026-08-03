@@ -4,7 +4,6 @@ import asyncio
 import json
 import logging
 import time
-import urllib.parse
 from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any, Callable
@@ -18,7 +17,7 @@ except ImportError:
     MT5_AVAILABLE = False
 
 from brain.config.constants import SUPPORTED_PAIRS, MIN_RISK_PERCENT, MAX_RISK_PERCENT
-from brain.config.settings import AI_BASE_URL, AI_MODEL
+from brain.config.settings import AI_BASE_URL
 from brain.db.postgres_ops import (
     get_state,
     set_state,
@@ -616,26 +615,13 @@ RESPOND naturally and conversationally. Do NOT output JSON or code unless callin
         self,
         messages: list[dict],
     ) -> str:
-        query_parts = []
-        for msg in messages:
-            role = msg.get("role", "user")
-            content = msg.get("content", "")
-            if role == "system":
-                query_parts.append(f"System: {content}")
-            elif role == "user":
-                query_parts.append(f"User: {content}")
-            elif role == "assistant":
-                query_parts.append(f"Assistant: {content}")
-        query = "\n\n".join(query_parts) + "\n\nAssistant:"
-        params = urllib.parse.urlencode({"text": query})
-        url = f"{AI_BASE_URL}?{params}"
-
+        payload = {"messages": messages, "max_tokens": 2000}
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    url,
+                async with session.post(
+                    AI_BASE_URL,
+                    json=payload,
                     timeout=aiohttp.ClientTimeout(total=60),
-                    headers={"Accept": "application/json"},
                 ) as resp:
                     if resp.status != 200:
                         body = await resp.text()
@@ -644,7 +630,12 @@ RESPOND naturally and conversationally. Do NOT output JSON or code unless callin
                     data = await resp.json()
                     if isinstance(data, str):
                         return data
-                    return (data.get("result", "")
+                    try:
+                        content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                    except Exception:
+                        content = ""
+                    return (content
+                            or data.get("result", "")
                             or data.get("message", {}).get("content", "")
                             or data.get("response", "")
                             or data.get("text", "")

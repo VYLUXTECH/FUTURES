@@ -9,13 +9,12 @@ import asyncio
 import json
 import logging
 import time
-import urllib.parse
 from collections import defaultdict
 from typing import Any
 
 import aiohttp
 
-from brain.config.settings import AI_BASE_URL, AI_MODEL, HF_TOKEN, HF_VISION_MODEL
+from brain.config.settings import AI_BASE_URL, HF_TOKEN, HF_VISION_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -143,28 +142,21 @@ async def _analyze_with_hf_vision(
 
 
 async def _call_ai_text(messages: list[dict]) -> dict:
-    query_parts = []
-    for msg in messages:
-        role = msg.get("role", "user")
-        content = msg.get("content", "")
-        if role == "system":
-            query_parts.append(f"System: {content}")
-        elif role == "user":
-            query_parts.append(f"User: {content}")
-        elif role == "assistant":
-            query_parts.append(f"Assistant: {content}")
-    query = "\n\n".join(query_parts) + "\n\nAssistant:"
-    params = urllib.parse.urlencode({"query": query, "model": AI_MODEL})
-    url = f"{AI_BASE_URL}/?{params}"
+    payload = {"messages": messages, "max_tokens": 2000}
 
     async with aiohttp.ClientSession() as session:
-        async with session.get(url, timeout=aiohttp.ClientTimeout(total=60)) as resp:
+        async with session.post(
+            AI_BASE_URL, json=payload, timeout=aiohttp.ClientTimeout(total=60)
+        ) as resp:
             if resp.status != 200:
                 text = await resp.text()
                 logger.error("AI text error %d: %s", resp.status, text[:300])
                 return {"error": f"upstream_error_{resp.status}"}
             data = await resp.json()
-            content = data.get("message", {}).get("content", "")
+            try:
+                content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+            except Exception:
+                content = data.get("message", {}).get("content", "")
             return {"content": content}
 
 
