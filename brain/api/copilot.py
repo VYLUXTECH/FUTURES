@@ -8,8 +8,10 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import ssl
 import time
 from collections import defaultdict
+from pathlib import Path
 from typing import Any
 
 import aiohttp
@@ -17,6 +19,17 @@ import aiohttp
 from brain.config.settings import AI_BASE_URL, HF_TOKEN, HF_VISION_MODEL
 
 logger = logging.getLogger(__name__)
+
+
+def _ai_ssl_context() -> ssl.SSLContext:
+    """Trust store for the AI endpoint. Uses certifi when available, else a bundled chain."""
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        pass
+    cert_file = Path(__file__).resolve().parent.parent.parent / "certs" / "qzz_chain.pem"
+    return ssl.create_default_context(cafile=str(cert_file))
 
 # ── Constants ──────────────────────────────────────────────
 COPILOT_CACHE_TTL: int = 300        # 5 minutes
@@ -144,7 +157,7 @@ async def _analyze_with_hf_vision(
 async def _call_ai_text(messages: list[dict]) -> dict:
     payload = {"messages": messages, "max_tokens": 2000}
 
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=_ai_ssl_context())) as session:
         async with session.post(
             AI_BASE_URL, json=payload, timeout=aiohttp.ClientTimeout(total=60)
         ) as resp:

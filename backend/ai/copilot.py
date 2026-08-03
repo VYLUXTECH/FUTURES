@@ -3,9 +3,11 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import ssl
 import time
 from collections import defaultdict
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Callable
 
 import aiohttp
@@ -41,6 +43,17 @@ logger = logging.getLogger(__name__)
 
 RATE_LIMIT_PER_MIN = 30
 CONFIRMATION_TIMEOUT = 120
+
+
+def _ai_ssl_context() -> ssl.SSLContext:
+    """Trust store for the AI endpoint. Uses certifi when available, else a bundled chain."""
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        pass
+    cert_file = Path(__file__).resolve().parent.parent.parent / "certs" / "qzz_chain.pem"
+    return ssl.create_default_context(cafile=str(cert_file))
 
 
 class CopilotEngine:
@@ -617,7 +630,7 @@ RESPOND naturally and conversationally. Do NOT output JSON or code unless callin
     ) -> str:
         payload = {"messages": messages, "max_tokens": 2000}
         try:
-            async with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=_ai_ssl_context())) as session:
                 async with session.post(
                     AI_BASE_URL,
                     json=payload,
