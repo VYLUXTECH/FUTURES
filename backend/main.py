@@ -7,12 +7,17 @@ import logging
 from pathlib import Path
 from contextlib import asynccontextmanager
 
+import asyncio
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Windows: use Selector loop (Proactor is unstable under QEMU TCG)
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 # ── Ensure brain/ flat imports resolve ──────────────────
 _PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
